@@ -1,4 +1,8 @@
 export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
     const response = await fetch("https://gamma-api.polymarket.com/tickers", {
       headers: { accept: "application/json" },
@@ -12,8 +16,6 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    console.log("✅ Raw data keys:", Object.keys(data));
-
     const tickers = Array.isArray(data)
       ? data
       : data.tickers || data.data || [];
@@ -34,7 +36,6 @@ export default async function handler(req, res) {
         m.price_no != null
     );
 
-    console.log("✅ Returning markets:", markets.length);
     res.status(200).json(markets);
   } catch (err) {
     console.error("❌ API route error:", err);
