@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch("https://gamma-api.polymarket.com/tickers", {
+    const response = await fetch("https://gamma-api.polymarket.com/markets", {
       headers: { accept: "application/json" },
     });
 
@@ -27,14 +27,14 @@ export default async function handler(req, res) {
         .json({ error: "Unexpected Polymarket data structure" });
     }
 
-    const markets = tickers.filter(
-      (m) =>
-        m.ticker &&
-        typeof m.ticker === "string" &&
-        m.ticker.includes("/") &&
-        m.price_yes != null &&
-        m.price_no != null
-    );
+  const markets = tickers.filter(
+  (m) =>
+    m.question &&
+    Array.isArray(m.outcomes) &&
+    m.outcomes.length >= 2 &&
+    typeof m.outcomes[0].price === "number" &&
+    typeof m.outcomes[1].price === "number"
+);
 
     res.status(200).json(markets);
   } catch (err) {
