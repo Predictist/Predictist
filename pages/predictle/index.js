@@ -67,26 +67,39 @@ export default function Predictle() {
       setLoading(true);
       setFetchError("");
       try {
-        const res = await fetch("/api/polymarket");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        // Data is already normalized to an array by the API route we wrote.
-        const arr = Array.isArray(data) ? data : [];
-        // Keep binary-ish with two outcomes and has question text
-        const filtered = arr.filter(
-          (m) =>
-            (m.active ?? true) &&
-            Array.isArray(m.outcomes) &&
-            m.outcomes.length >= 2 &&
-            typeof m.question === "string" &&
-            m.question.trim().length > 0
-        );
-        if (mounted) setMarkets(filtered);
-      } catch (e) {
-        if (mounted) setFetchError("Failed to load markets. Please try again.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
+  const res = await fetch("/api/polymarket");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const data = await res.json();
+
+  // ✅ Normalize markets structure correctly
+  const markets = Array.isArray(data)
+    ? data
+    : data.markets || data.data?.markets || [];
+
+  console.log("✅ Markets fetched:", markets.length);
+
+  // ✅ Filter out only valid binary-style markets
+  const filtered = markets.filter(
+    (m) =>
+      (m.active ?? true) &&
+      Array.isArray(m.outcomes) &&
+      m.outcomes.length >= 2 &&
+      typeof m.question === "string" &&
+      m.question.trim().length > 0
+  );
+
+  if (filtered.length === 0) {
+    console.warn("⚠️ No valid markets after filtering");
+  }
+
+  setMarkets(filtered);
+} catch (error) {
+  console.error("❌ Error fetching markets:", error);
+  setFetchError("Failed to fetch markets.");
+} finally {
+  setLoading(false);
+}
     })();
     return () => {
       mounted = false;
