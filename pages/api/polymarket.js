@@ -1,7 +1,5 @@
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  console.log("🟢 /api/polymarket route hit"); // <-- Add this line
 
   try {
     const response = await fetch("https://gamma-api.polymarket.com/markets", {
@@ -16,11 +14,11 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
+    console.log("🧩 Raw Polymarket response:", data); // <-- Add this too
+
     const tickers = Array.isArray(data)
       ? data
-      : data.tickers || data.data || [];
-      console.log("🧪 Sample market object:", tickers[0]);
-
+      : data.markets || data.data || [];
 
     if (!Array.isArray(tickers)) {
       console.error("❌ Unexpected Polymarket data structure:", data);
@@ -29,15 +27,16 @@ export default async function handler(req, res) {
         .json({ error: "Unexpected Polymarket data structure" });
     }
 
-  const markets = tickers.filter(
-  (m) =>
-    m.question &&
-    Array.isArray(m.outcomes) &&
-    m.outcomes.length >= 2 &&
-    typeof m.outcomes[0].price === "number" &&
-    typeof m.outcomes[1].price === "number"
-);
+    const markets = tickers.filter(
+      (m) =>
+        m.ticker &&
+        typeof m.ticker === "string" &&
+        m.ticker.includes("/") &&
+        m.price_yes != null &&
+        m.price_no != null
+    );
 
+    console.log("✅ Returning markets:", markets.length);
     res.status(200).json(markets);
   } catch (err) {
     console.error("❌ API route error:", err);
