@@ -41,13 +41,13 @@ export default function Predictle() {
     try {
       const res = await fetch("/api/polymarket");
       const data = await res.json();
-      const markets = Array.isArray(data) ? data : data.markets || [];
-      const active = markets.filter(
-        (m) =>
-          m.active &&
-          m.outcomes?.length >= 2 &&
-          !m.question.toLowerCase().includes("test")
-      );
+      const markets = Array.isArray(data)
+  ? data
+  : data.markets || data.data?.markets || [];
+
+console.log("✅ Markets received:", markets.slice(0, 3));
+
+const active = markets.filter((m) => m.outcomes?.length >= 2);
 
       const todayUTC = new Date().toISOString().split("T")[0];
       const index = todayUTC
