@@ -82,25 +82,43 @@ export default function Predictle() {
   console.log("🧪 Full market sample:", markets[0]);
 
   // ✅ Filter for live binary markets using outcomePrices
-  const filtered = markets.filter((m) => {
-    const hasQuestion =
-      typeof m.question === "string" && m.question.trim().length > 0;
-    const hasPrices =
-      Array.isArray(m.outcomePrices) && m.outcomePrices.length >= 2;
-    const notTest = !m.slug?.toLowerCase().includes("test");
+  // ✅ Handle nested structure properly — outcomePrices may be under "markets[i].outcomes" array
+// ✅ Handle nested structures properly (works with all Polymarket API variants)
+const filtered = markets.filter((m) => {
+  const hasQuestion =
+    typeof m.question === "string" && m.question.trim().length > 0;
 
-    return hasQuestion && hasPrices && notTest;
-  });
+  // Extract prices depending on structure
+  let prices = [];
 
-  console.log("✅ Filtered markets:", filtered.length);
-  if (filtered.length > 0) {
-    console.log("🧪 Example filtered market:", filtered[0]);
-  } else {
-    console.warn(
-      "⚠️ Still no valid markets — structure may differ. First sample:",
-      markets[0]
-    );
+  if (Array.isArray(m.outcomePrices)) {
+    prices = m.outcomePrices;
+  } else if (Array.isArray(m.outcomes)) {
+    // Some outcomes have prices nested under { price: { mid: number } }
+    prices = m.outcomes
+      .map((o) => {
+        if (typeof o.price === "number") return o.price;
+        if (o.price && typeof o.price.mid === "number") return o.price.mid;
+        return undefined;
+      })
+      .filter((p) => typeof p === "number");
   }
+
+  const hasPrices = prices.length >= 2;
+  const notTest = !m.slug?.toLowerCase().includes("test");
+
+  return hasQuestion && hasPrices && notTest;
+});
+
+console.log("✅ Filtered markets:", filtered.length);
+if (filtered.length > 0) {
+  console.log("🧪 Example filtered market:", filtered[0]);
+} else {
+  console.warn(
+    "⚠️ Still no valid markets — structure may differ. First sample:",
+    markets[0]
+  );
+}
 
   setMarkets(filtered);
 } catch (error) {
