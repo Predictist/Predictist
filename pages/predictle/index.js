@@ -71,6 +71,7 @@ export default function Predictle() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const markets = await res.json();
+  console.log("🧩 Sample raw market:", markets[0]);
 
   console.log("✅ Markets fetched:", markets.length);
   console.log("🧪 Example market:", markets[0]);
