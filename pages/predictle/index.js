@@ -41,7 +41,7 @@ export default function Predictle() {
     try {
       const res = await fetch("/api/polymarket");
       const data = await res.json();
-      const active = data?.filter(
+      const active = markets.filter(
         (m) =>
           m.active &&
           m.outcomes?.length === 2 &&
