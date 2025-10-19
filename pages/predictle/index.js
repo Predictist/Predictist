@@ -76,12 +76,25 @@ export default function Predictle() {
   console.log("🧪 Example market:", markets[0]);
 
   // ✅ Filter for binary markets that have both prices
-  const filtered = markets.filter(
-    (m) =>
-      typeof m.ticker === "string" &&
-      m.price_yes != null &&
-      m.price_no != null
+// ✅ Updated filter for CLOB markets (new structure)
+const filtered = markets.filter((m) => {
+  const hasQuestion = typeof m.question === "string" && m.question.trim().length > 0;
+  const hasOutcomes = Array.isArray(m.outcomes) && m.outcomes.length >= 2;
+
+  // Extract outcome prices
+  const yesOutcome = m.outcomes?.find(
+    (o) => o.name?.toLowerCase().includes("yes")
   );
+  const noOutcome = m.outcomes?.find(
+    (o) => o.name?.toLowerCase().includes("no")
+  );
+
+  const hasPrices =
+    (yesOutcome && typeof yesOutcome.price === "number") ||
+    (noOutcome && typeof noOutcome.price === "number");
+
+  return hasQuestion && hasOutcomes && hasPrices && !m.closed;
+});
 
   console.log("✅ Filtered markets:", filtered.length);
   console.log("🧪 Example filtered:", filtered[0]);
