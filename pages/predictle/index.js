@@ -70,55 +70,21 @@ export default function Predictle() {
   const res = await fetch("/api/polymarket");
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  const data = await res.json();
-
-  // ✅ Normalize markets structure correctly
-  const markets = Array.isArray(data)
-    ? data
-    : data.markets || data.data?.markets || [];
+  const markets = await res.json();
 
   console.log("✅ Markets fetched:", markets.length);
-  console.log("🧪 Market keys:", Object.keys(markets[0]));
-  console.log("🧪 Full market sample:", markets[0]);
+  console.log("🧪 Example market:", markets[0]);
 
-  // ✅ Filter for live binary markets using outcomePrices
-  // ✅ Handle nested structure properly — outcomePrices may be under "markets[i].outcomes" array
-// ✅ Handle nested structures properly (works with all Polymarket API variants)
-const filtered = markets.filter((m) => {
-  const hasQuestion =
-    typeof m.question === "string" && m.question.trim().length > 0;
-
-  // Extract prices depending on structure
-  let prices = [];
-
-  if (Array.isArray(m.outcomePrices)) {
-    prices = m.outcomePrices;
-  } else if (Array.isArray(m.outcomes)) {
-    // Some outcomes have prices nested under { price: { mid: number } }
-    prices = m.outcomes
-      .map((o) => {
-        if (typeof o.price === "number") return o.price;
-        if (o.price && typeof o.price.mid === "number") return o.price.mid;
-        return undefined;
-      })
-      .filter((p) => typeof p === "number");
-  }
-
-  const hasPrices = prices.length >= 2;
-  const notTest = !m.slug?.toLowerCase().includes("test");
-
-  return hasQuestion && hasPrices && notTest;
-});
-
-console.log("✅ Filtered markets:", filtered.length);
-if (filtered.length > 0) {
-  console.log("🧪 Example filtered market:", filtered[0]);
-} else {
-  console.warn(
-    "⚠️ Still no valid markets — structure may differ. First sample:",
-    markets[0]
+  // ✅ Filter for binary markets that have both prices
+  const filtered = markets.filter(
+    (m) =>
+      typeof m.ticker === "string" &&
+      m.price_yes != null &&
+      m.price_no != null
   );
-}
+
+  console.log("✅ Filtered markets:", filtered.length);
+  console.log("🧪 Example filtered:", filtered[0]);
 
   setMarkets(filtered);
 } catch (error) {
