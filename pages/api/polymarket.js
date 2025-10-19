@@ -19,6 +19,8 @@ export default async function handler(req, res) {
     const tickers = Array.isArray(data)
       ? data
       : data.tickers || data.data || [];
+      console.log("🧪 Sample market object:", tickers[0]);
+
 
     if (!Array.isArray(tickers)) {
       console.error("❌ Unexpected Polymarket data structure:", data);
