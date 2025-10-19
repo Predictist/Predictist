@@ -80,18 +80,23 @@ export default function Predictle() {
   console.log("✅ Markets fetched:", markets.length);
 
   // ✅ Filter out only valid binary-style markets
-  const filtered = markets.filter(
-    (m) =>
-      (m.active ?? true) &&
-      Array.isArray(m.outcomes) &&
-      m.outcomes.length >= 2 &&
-      typeof m.question === "string" &&
-      m.question.trim().length > 0
-  );
+ // ✅ Flexible normalization for different Polymarket structures
+const filtered = markets.filter((m) => {
+  const hasQuestion = typeof m.question === "string" && m.question.trim().length > 0;
 
-  if (filtered.length === 0) {
-    console.warn("⚠️ No valid markets after filtering");
-  }
+  // Handle multiple data shapes
+  const possibleOutcomes =
+    m.outcomes || m.tokens || m.outcomePrices || [];
+
+  const hasOutcomes = Array.isArray(possibleOutcomes) && possibleOutcomes.length >= 2;
+
+  return hasQuestion && hasOutcomes;
+});
+
+console.log("✅ Filtered markets:", filtered.length);
+if (filtered.length === 0) {
+  console.warn("⚠️ Still no valid markets — structure may differ. First sample:", markets[0]);
+}
 
   setMarkets(filtered);
 } catch (error) {
