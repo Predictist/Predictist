@@ -1,28 +1,45 @@
 export default async function handler(req, res) {
   try {
-    const response = await fetch("https://gamma-api.polymarket.com/tickers");
+    const response = await fetch("https://gamma-api.polymarket.com/tickers", {
+      headers: {
+        "accept": "application/json",
+      },
+    });
+
     if (!response.ok) {
-      throw new Error(`Polymarket API error: ${response.status}`);
+      console.error("❌ Polymarket API fetch failed:", response.status);
+      return res.status(response.status).json({
+        error: `Polymarket API returned ${response.status}`,
+      });
     }
 
     const data = await response.json();
-    console.log("✅ Raw Polymarket data:", data.slice(0, 2));
+    console.log("✅ Raw data keys:", Object.keys(data));
 
-    // Each item has structure like: { ticker, price_yes, price_no, ... }
-    const markets = data.filter(
+    // ✅ Some responses come nested (like data.tickers)
+    const tickers = Array.isArray(data)
+      ? data
+      : data.tickers || data.data || [];
+
+    if (!Array.isArray(tickers)) {
+      console.error("❌ Unexpected API shape:", data);
+      return res.status(500).json({ error: "Unexpected Polymarket data shape" });
+    }
+
+    // ✅ Filter for binary markets with both prices
+    const markets = tickers.filter(
       (m) =>
         m.ticker &&
         typeof m.ticker === "string" &&
-        m.ticker.toLowerCase().includes("/") &&
+        m.ticker.includes("/") &&
         m.price_yes != null &&
         m.price_no != null
     );
 
+    console.log("✅ Returning markets:", markets.length);
     res.status(200).json(markets);
   } catch (err) {
-    console.error("❌ Polymarket API error:", err);
-    res.status(500).json({ error: "Failed to fetch Polymarket markets" });
+    console.error("❌ API route error:", err);
+    res.status(500).json({ error: "Server error fetching Polymarket markets" });
   }
 }
-
-
