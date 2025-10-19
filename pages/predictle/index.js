@@ -79,33 +79,28 @@ export default function Predictle() {
 
   console.log("✅ Markets fetched:", markets.length);
   console.log("🧪 Market keys:", Object.keys(markets[0]));
-console.log("🧪 Full market sample:", markets[0]);
+  console.log("🧪 Full market sample:", markets[0]);
 
+  // ✅ Filter for live binary markets using outcomePrices
+  const filtered = markets.filter((m) => {
+    const hasQuestion =
+      typeof m.question === "string" && m.question.trim().length > 0;
+    const hasPrices =
+      Array.isArray(m.outcomePrices) && m.outcomePrices.length >= 2;
+    const notTest = !m.slug?.toLowerCase().includes("test");
 
-  // ✅ Filter out only valid binary-style markets
- // ✅ Flexible normalization for different Polymarket structures
-// ✅ Handle Polymarket Gamma structure
-const filtered = markets.filter((m) => {
-  const hasQuestion = typeof m.question === "string" && m.question.trim().length > 0;
+    return hasQuestion && hasPrices && notTest;
+  });
 
-  // Outcomes can appear under either key:
-  const possibleOutcomes = Array.isArray(m.outcomes)
-    ? m.outcomes
-    : Array.isArray(m.outcomePrices)
-    ? m.outcomePrices
-    : [];
-
-  // Some markets are old, archived, or testing — filter those out
-  const notTest = !m.slug?.toLowerCase().includes("test");
-
-  return hasQuestion && possibleOutcomes.length >= 2 && notTest;
-});
-
-console.log("✅ Filtered markets:", filtered.length);
-console.log("🧪 Example filtered market:", filtered[0]);
-if (filtered.length === 0) {
-  console.warn("⚠️ Still no valid markets — structure may differ. First sample:", markets[0]);
-}
+  console.log("✅ Filtered markets:", filtered.length);
+  if (filtered.length > 0) {
+    console.log("🧪 Example filtered market:", filtered[0]);
+  } else {
+    console.warn(
+      "⚠️ Still no valid markets — structure may differ. First sample:",
+      markets[0]
+    );
+  }
 
   setMarkets(filtered);
 } catch (error) {
