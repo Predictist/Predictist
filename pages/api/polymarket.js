@@ -12,13 +12,16 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    console.log("✅ Raw API data keys:", Object.keys(data));
-    console.log("🧪 Sample market:", data?.[0] || "No markets found");
 
-    // ✅ Normalize and return directly
+    // ✅ Extract the actual markets array
     const markets = Array.isArray(data)
       ? data
-      : data.markets || data.data || [];
+      : Array.isArray(data.data)
+      ? data.data
+      : [];
+
+    console.log("✅ Total markets fetched:", markets.length);
+    console.log("🧪 Sample market:", markets[0]);
 
     res.status(200).json(markets);
   } catch (err) {
@@ -26,3 +29,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Server error fetching Polymarket markets" });
   }
 }
+
