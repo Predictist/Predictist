@@ -77,25 +77,31 @@ export default function Predictle() {
   console.log("🧪 Example market:", markets[0]);
 
   // ✅ Filter for binary markets that have both prices
-// ✅ Updated filter for CLOB markets (new structure)
+// ✅ Updated filter for new Polymarket CLOB format
+// ✅ Final filter for new Polymarket CLOB structure
 const filtered = markets.filter((m) => {
-  const hasQuestion = typeof m.question === "string" && m.question.trim().length > 0;
-  const hasOutcomes = Array.isArray(m.outcomes) && m.outcomes.length >= 2;
+  // Some markets use 'title' or 'condition_title' instead of 'question'
+  const question = m.question || m.title || m.condition_title;
+  const hasQuestion = typeof question === "string" && question.trim().length > 0;
 
-  // Extract outcome prices
-  const yesOutcome = m.outcomes?.find(
-    (o) => o.name?.toLowerCase().includes("yes")
+  // Use 'tokens' instead of 'outcomes'
+  const tokens = Array.isArray(m.tokens) ? m.tokens : [];
+
+  // Only include binary markets (2 possible outcomes)
+  const hasTwoOutcomes = tokens.length === 2;
+
+  // Check if both prices are valid numbers between 0–1
+  const hasValidPrices = tokens.every(
+    (t) => typeof t.price === "number" && t.price >= 0 && t.price <= 1
   );
-  const noOutcome = m.outcomes?.find(
-    (o) => o.name?.toLowerCase().includes("no")
-  );
 
-  const hasPrices =
-    (yesOutcome && typeof yesOutcome.price === "number") ||
-    (noOutcome && typeof noOutcome.price === "number");
+  // Exclude closed or archived markets if present
+  const isActive = m.closed === false || !m.closed;
 
-  return hasQuestion && hasOutcomes && hasPrices && !m.closed;
+  return hasQuestion && hasTwoOutcomes && hasValidPrices && isActive;
 });
+
+
 
   console.log("✅ Filtered markets:", filtered.length);
   console.log("🧪 Example filtered:", filtered[0]);
