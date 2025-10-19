@@ -1,32 +1,43 @@
-export default async function handler(req, res) {
-  try {
-    const response = await fetch("https://clob.polymarket.com/markets", {
-      headers: { accept: "application/json" },
-    });
+const handleGuess = (choice) => {
+  if (!current || locked) return;
 
-    if (!response.ok) {
-      console.error("❌ Polymarket API fetch failed:", response.status);
-      return res.status(response.status).json({
-        error: `Polymarket API returned ${response.status}`,
-      });
+  // ✅ Use tokens instead of outcomes
+  const tokens = Array.isArray(current.tokens) ? current.tokens : [];
+
+  // Try to detect yes/no by name if available
+  const yesToken =
+    tokens.find((t) => t.outcome?.toUpperCase() === "YES") || tokens[0];
+  const noToken =
+    tokens.find((t) => t.outcome?.toUpperCase() === "NO") || tokens[1];
+
+  // Fallback if undefined
+  const yes = Number(yesToken?.price ?? 0);
+  const no = Number(noToken?.price ?? 0);
+
+  // Determine favored outcome
+  const favored = yes > no ? "YES" : "NO";
+  const correct = choice === favored;
+
+  setFeedback({ type: correct ? "correct" : "wrong", probs: { yes, no } });
+
+  const newGrid = [...grid, correct ? "🟩" : "🟥"];
+  setGrid(newGrid);
+
+  if (correct) spawnConfetti(80);
+
+  localStorage.setItem("predictle_daily_last", TODAY);
+  localStorage.setItem("predictle_daily_grid", JSON.stringify(newGrid));
+
+  setTimeout(() => {
+    const nextStep = step + 1;
+    if (nextStep >= 5) {
+      setStep(5);
+      localStorage.setItem("predictle_daily_step", "5");
+      setLocked(true);
+    } else {
+      setStep(nextStep);
+      localStorage.setItem("predictle_daily_step", String(nextStep));
     }
-
-    const data = await response.json();
-
-    // ✅ Extract the actual markets array
-    const markets = Array.isArray(data)
-      ? data
-      : Array.isArray(data.data)
-      ? data.data
-      : [];
-
-    console.log("✅ Total markets fetched:", markets.length);
-    console.log("🧪 Sample market:", markets[0]);
-
-    res.status(200).json(markets);
-  } catch (err) {
-    console.error("❌ API route error:", err);
-    res.status(500).json({ error: "Server error fetching Polymarket markets" });
-  }
-}
-
+    setFeedback(null);
+  }, 1200);
+};
