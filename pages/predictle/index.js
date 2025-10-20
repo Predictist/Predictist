@@ -106,7 +106,7 @@ export default function Predictle() {
   }, []);
 
   /* -----------------------------------------------
-     Market Fetch with Progressive Backoff (fixed)
+     Market Fetch with Progressive Backoff (Gamma fixed)
   ----------------------------------------------- */
   useEffect(() => {
     let mounted = true;
@@ -124,7 +124,7 @@ export default function Predictle() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // ✅ Normalize Gamma API data
+        // ✅ Normalize Gamma API structure
         const normalized = data.flatMap((event) => {
           if (Array.isArray(event.markets) && event.markets.length > 0) {
             return event.markets.map((m) => ({
@@ -142,33 +142,45 @@ export default function Predictle() {
           };
         });
 
-        // ✅ Filter valid markets
+        // ✅ Filter valid markets (looser for Gamma)
         const filtered = normalized.filter((m) => {
-          const q = cleanQuestion(m.question);
-          const os = m.outcomes || [];
-          if (os.length !== 2) return false; // only YES/NO
-          if (os.some((o) => o.price <= 0 || o.price >= 1)) return false;
+          const q = cleanQuestion(m.question || "");
+          const os = (m.outcomes || []).filter(
+            (o) => typeof o.price === "number" && o.price > 0 && o.price < 1
+          );
+
+          if (os.length < 2) return false; // must have at least 2
           const lower = q.toLowerCase();
+
           if (
             lower.includes("test") ||
             lower.includes("archive") ||
-            lower.includes("resolve")
+            lower.includes("resolve") ||
+            lower.includes("deprecated") ||
+            lower.includes("void")
           )
             return false;
+
           const old = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(q);
           return q.length > 8 && !old;
         });
 
+        // ✅ Only keep first 2 outcomes for game consistency
+        const trimmed = filtered.map((m) => ({
+          ...m,
+          outcomes: m.outcomes.slice(0, 2),
+        }));
+
         // ✅ Deduplicate
         const seen = new Set();
-        const deduped = filtered.filter((m) => {
+        const deduped = trimmed.filter((m) => {
           if (seen.has(m.id)) return false;
           seen.add(m.id);
           return true;
         });
 
         console.log(
-          `Fetched: ${data.length} → filtered: ${filtered.length} → deduped: ${deduped.length}`
+          `Fetched: ${data.length} → filtered: ${filtered.length} → trimmed: ${trimmed.length} → deduped: ${deduped.length}`
         );
 
         if (!deduped.length) {
@@ -291,9 +303,19 @@ export default function Predictle() {
       {/* Content */}
       <div className="mx-auto max-w-4xl mt-6">
         {tab === "daily" ? (
-          <DailyChallenge dark={dark} markets={dailyMarkets} loading={loading} fetchError={fetchError} />
+          <DailyChallenge
+            dark={dark}
+            markets={dailyMarkets}
+            loading={loading}
+            fetchError={fetchError}
+          />
         ) : (
-          <FreePlay dark={dark} markets={freeMarkets} loading={loading} fetchError={fetchError} />
+          <FreePlay
+            dark={dark}
+            markets={freeMarkets}
+            loading={loading}
+            fetchError={fetchError}
+          />
         )}
       </div>
 
