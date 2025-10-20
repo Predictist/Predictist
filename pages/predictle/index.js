@@ -1,70 +1,50 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 
-/* -------------------- utilities -------------------- */
-const utcYYYYMMDD = () => new Date().toISOString().split("T")[0];
-
-function pickDailyIndices(count, poolLen, seedStr) {
-  let seed = seedStr.split("-").reduce((s, p) => s + parseInt(p), 0);
-  const taken = new Set();
-  const out = [];
-  while (out.length < Math.min(count, poolLen)) {
-    seed = (seed * 9301 + 49297) % 233280;
-    const idx = seed % poolLen;
-    if (!taken.has(idx)) {
-      taken.add(idx);
-      out.push(idx);
-    }
-  }
-  return out;
+/* -------------------- toast (no deps) -------------------- */
+function showToast(message) {
+  const el = document.createElement("div");
+  el.className = "predictle-toast";
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("show"));
+  setTimeout(() => {
+    el.classList.remove("show");
+    setTimeout(() => el.remove(), 300);
+  }, 1800);
 }
 
-function classNames(...c) {
-  return c.filter(Boolean).join(" ");
-}
+/* -------------------- helper functions -------------------- */
+const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
-/* -------------------- confetti -------------------- */
-function spawnConfetti(burst = 60) {
-  const container = document.createElement("div");
-  container.classList.add("confetti-container");
-  document.body.appendChild(container);
-  for (let i = 0; i < burst; i++) {
-    const confetti = document.createElement("div");
-    confetti.classList.add("confetti");
-    confetti.style.left = Math.random() * 100 + "vw";
-    confetti.style.animationDelay = Math.random() * 2 + "s";
-    confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
-    container.appendChild(confetti);
-  }
-  setTimeout(() => container.remove(), 4000);
-}
-
-/* -------------------- main page -------------------- */
 export default function Predictle() {
-  const [dark, setDark] = useState(false);
-  const [tab, setTab] = useState("daily");
   const [markets, setMarkets] = useState([]);
+  const [dailyMarkets, setDailyMarkets] = useState([]);
+  const [freeMarkets, setFreeMarkets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
-  const [tLeft, setTLeft] = useState({ h: "00", m: "00", s: "00" });
+  const [dark, setDark] = useState(false);
+  const [tab, setTab] = useState("daily");
+  const [locked, setLocked] = useState(false);
+  const [step, setStep] = useState(1);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("predictle_theme");
-    if (saved === "dark") setDark(true);
-  }, []);
-
+  /* -------------------- fetch markets -------------------- */
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      setLoading(true);
-      setFetchError("");
+    let retryTimer = null;
+    let retryCount = 0;
+
+    const fetchMarkets = async (manual = false) => {
       try {
+        if (manual) showToast("Refreshing markets…");
+        console.log(manual ? "🔁 Manual refresh triggered" : "🔄 Fetching Polymarket markets...");
+        if (!manual) setLoading(true);
+        setFetchError("");
+
         const res = await fetch("/api/polymarket");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
         console.log("✅ Raw markets:", data.length);
 
-        /* ---------- filtering ---------- */
         const filtered = data
           .filter((m) => {
             const q = m.question || m.title || m.condition_title || m.slug || "";
@@ -77,9 +57,14 @@ export default function Predictle() {
             const tokens = Array.isArray(m.tokens) ? m.tokens : [];
             if (tokens.length < 2) return false;
 
-            const hasYesNo =
-              tokens.some((t) => /yes/i.test(t.outcome || "")) &&
-              tokens.some((t) => /no/i.test(t.outcome || ""));
+            const yesOutcome = tokens.find((t) =>
+              /yes/i.test(t.outcome || t.name || "")
+            );
+            const noOutcome = tokens.find((t) =>
+              /no/i.test(t.outcome || t.name || "")
+            );
+
+            const hasYesNo = !!(yesOutcome && noOutcome);
             const isBinary =
               hasYesNo ||
               (tokens.length === 2 &&
@@ -103,6 +88,7 @@ export default function Predictle() {
 
             return (
               isBinary &&
+              hasYesNo &&
               isActive &&
               cleanQ.length > 10 &&
               daysOld < 365
@@ -122,188 +108,200 @@ export default function Predictle() {
                 .trim(),
           }));
 
-        console.log("✅ Filtered markets:", filtered.length);
-        if (filtered.length > 0)
-          console.log("🧪 Example:", filtered[0].question);
+        // 🧹 Deduplicate
+        const seen = new Set();
+        const deduped = filtered.filter((m) => {
+          const key = m.question.toLowerCase().slice(0, 60);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
 
-        if (mounted) setMarkets(filtered);
+        console.log(`🧩 Deduped markets: ${deduped.length}`);
+        if (mounted) {
+          if (deduped.length === 0) {
+            retryCount++;
+            const delay = Math.min(5, retryCount * 2 - 1) * 60 * 1000;
+            console.warn(`⚠️ No valid markets found — retrying in ${delay / 60000} min...`);
+            if (manual) showToast(`No markets found. Retrying in ${delay / 60000} min`);
+            retryTimer = setTimeout(() => fetchMarkets(false), delay);
+          } else {
+            retryCount = 0;
+
+            // 🔀 Split markets into two pools
+            const shuffled = shuffle(deduped);
+            const splitIndex = Math.floor(shuffled.length * 0.6);
+            const dailyPool = shuffled.slice(0, splitIndex);
+            const freePool = shuffled.slice(splitIndex);
+
+            setMarkets(deduped);
+            setDailyMarkets(dailyPool);
+            setFreeMarkets(freePool);
+
+            if (manual)
+              showToast(
+                `✅ Updated • ${deduped.length} markets (${dailyPool.length} daily / ${freePool.length} free)`
+              );
+          }
+        }
       } catch (e) {
         console.error("❌ Error fetching markets:", e);
-        if (mounted) setFetchError("Failed to fetch markets.");
+        if (mounted) {
+          retryCount++;
+          const delay = Math.min(5, retryCount * 2 - 1) * 60 * 1000;
+          setFetchError(`Fetch failed. Retrying in ${delay / 60000} minutes...`);
+          if (manual) showToast(`❌ Fetch failed • retry in ${delay / 60000} min`);
+          retryTimer = setTimeout(() => fetchMarkets(false), delay);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
+    };
+
+    fetchMarkets();
+    window.refreshMarkets = () => fetchMarkets(true);
+
     return () => {
       mounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, []);
 
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      const nextUTC = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
-      );
-      const diff = nextUTC - now;
-      const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
-      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
-      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-      setTLeft({ h, m, s });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
+  /* -------------------- handle guess -------------------- */
+  const handleGuess = (choice) => {
+    const activePool = tab === "daily" ? dailyMarkets : freeMarkets;
+    if (!activePool.length || locked) return;
 
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem("predictle_theme", next ? "dark" : "light");
+    const current = activePool[step - 1];
+    if (!current) return;
+
+    const outcomes = Array.isArray(current.outcomes)
+      ? current.outcomes
+      : current.tokens || [];
+
+    const yesOutcome =
+      outcomes.find((o) => /yes/i.test(o.name || o.outcome || "")) ||
+      outcomes[0];
+    const noOutcome =
+      outcomes.find((o) => /no/i.test(o.name || o.outcome || "")) ||
+      outcomes[1];
+
+    const yes = Number(yesOutcome?.price ?? 0);
+    const no = Number(noOutcome?.price ?? 0);
+    const favored = yes > no ? "YES" : "NO";
+    const correct = choice === favored;
+
+    showToast(correct ? "✅ Correct!" : "❌ Not this time!");
+    setLocked(true);
+    setTimeout(() => {
+      setLocked(false);
+      setStep((s) => (s < 5 ? s + 1 : 1));
+    }, 1200);
   };
+
+  /* -------------------- render -------------------- */
+  const activePool = tab === "daily" ? dailyMarkets : freeMarkets;
 
   return (
     <main
-      className={classNames(
-        "min-h-screen p-6 transition-colors duration-500",
-        dark ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900"
-      )}
+      className={`min-h-screen ${
+        dark ? "bg-gray-900 text-white" : "bg-gray-100 text-black"
+      }`}
     >
-      <div className="mx-auto max-w-4xl flex items-center justify-between">
-        <h1 className="text-2xl sm:text-3xl font-bold">Predictle</h1>
-        <button
-          onClick={toggleTheme}
-          className="px-3 py-1 border rounded-lg text-sm hover:bg-gray-700/10"
-        >
-          {dark ? "☀️ Light" : "🌙 Dark"}
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="mx-auto max-w-4xl mt-6">
-        <div className="inline-flex rounded-xl overflow-hidden border">
+      <div className="flex justify-between items-center p-4">
+        <h1 className="text-3xl font-bold">Predictle</h1>
+        <div className="flex gap-2 items-center">
           <button
-            className={classNames(
-              "px-4 py-2 text-sm font-medium",
-              tab === "daily"
-                ? dark
-                  ? "bg-gray-800"
-                  : "bg-white"
-                : "bg-transparent"
-            )}
             onClick={() => setTab("daily")}
+            className={`px-3 py-1 rounded-md ${
+              tab === "daily" ? "bg-green-500 text-white" : "bg-gray-300"
+            }`}
           >
-            Daily Challenge 🟩🟥
+            Daily Challenge
           </button>
           <button
-            className={classNames(
-              "px-4 py-2 text-sm font-medium border-l",
-              tab === "free"
-                ? dark
-                  ? "bg-gray-800"
-                  : "bg-white"
-                : "bg-transparent"
-            )}
             onClick={() => setTab("free")}
+            className={`px-3 py-1 rounded-md ${
+              tab === "free" ? "bg-pink-500 text-white" : "bg-gray-300"
+            }`}
           >
-            Free Play 🎯
+            Free Play
+          </button>
+          <button
+            onClick={() => (window.refreshMarkets(), showToast("Refreshing markets…"))}
+            className="ml-4 px-3 py-1 text-sm border rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+          >
+            🔁 Refresh Markets
+          </button>
+          <button
+            onClick={() => setDark((d) => !d)}
+            className="ml-4 px-3 py-1 border rounded-md"
+          >
+            {dark ? "☀️ Light" : "🌙 Dark"}
           </button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl mt-6">
-        {tab === "daily" ? (
-          <DailyChallenge dark={dark} markets={markets} loading={loading} fetchError={fetchError} />
+      <div className="max-w-3xl mx-auto p-4">
+        {loading ? (
+          <p className="text-gray-500">Loading markets...</p>
+        ) : fetchError ? (
+          <p className="text-red-500">{fetchError}</p>
+        ) : activePool.length === 0 ? (
+          <p className="text-gray-500">
+            No {tab === "daily" ? "daily" : "free play"} markets available.
+          </p>
         ) : (
-          <FreePlay dark={dark} markets={markets} loading={loading} fetchError={fetchError} />
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-2">
+              {tab === "daily" ? "Daily Challenge" : "Free Play"} — {step}/5
+            </h2>
+            <p className="mb-4">
+              {activePool[step - 1]?.question || "Loading question..."}
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg"
+                onClick={() => handleGuess("YES")}
+                disabled={locked}
+              >
+                YES
+              </button>
+              <button
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
+                onClick={() => handleGuess("NO")}
+                disabled={locked}
+              >
+                NO
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
-      <div className="mx-auto max-w-4xl text-center mt-10 text-gray-500 text-sm">
-        <p className="mb-1">🌍 Next Daily Challenge (00:00 UTC)</p>
-        <div className="flex gap-2 text-2xl font-mono justify-center">
-          {Object.values(tLeft).map((unit, i) => (
-            <div
-              key={i}
-              className={classNames(
-                "rounded-lg px-3 py-2 transition-all duration-700 transform hover:scale-110",
-                dark ? "bg-gray-800" : "bg-gray-700/10"
-              )}
-            >
-              {unit}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <style jsx>{`
-        .confetti-container {
+      {/* 🧁 Toast styles */}
+      <style jsx global>{`
+        .predictle-toast {
           position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          overflow: hidden;
-          z-index: 40;
+          left: 50%;
+          bottom: 24px;
+          transform: translateX(-50%) translateY(10px);
+          background: rgba(17, 24, 39, 0.95);
+          color: #fff;
+          padding: 10px 14px;
+          border-radius: 10px;
+          font-size: 14px;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+          opacity: 0;
+          z-index: 9999;
+          transition: transform 0.2s ease, opacity 0.2s ease;
         }
-        .confetti {
-          position: absolute;
-          width: 8px;
-          height: 14px;
-          opacity: 0.9;
-          animation: fall 3s linear forwards;
-        }
-        @keyframes fall {
-          0% { transform: translateY(-10vh) rotate(0deg); }
-          100% { transform: translateY(100vh) rotate(720deg); }
+        .predictle-toast.show {
+          transform: translateX(-50%) translateY(0);
+          opacity: 1;
         }
       `}</style>
     </main>
-  );
-}
-
-/* ------------------ Reusable UI ------------------ */
-function Card({ dark, children }) {
-  return (
-    <div
-      className={classNames(
-        "shadow-md rounded-xl p-6",
-        dark ? "bg-gray-800" : "bg-white"
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Button({ children, onClick, color = "blue" }) {
-  const colorMap = {
-    blue: "bg-blue-600 hover:bg-blue-700",
-    green: "bg-green-600 hover:bg-green-700",
-    red: "bg-red-600 hover:bg-red-700",
-  };
-  return (
-    <button
-      onClick={onClick}
-      className={`${colorMap[color]} text-white px-5 py-3 rounded-lg transition`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Badge({ children }) {
-  return <span className="px-3 py-1 rounded-full border text-sm">{children}</span>;
-}
-
-function Stat({ label, value, color }) {
-  const text = color === "green" ? "text-green-500" : "text-blue-500";
-  return (
-    <div className="rounded-lg px-5 py-3 text-center border">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={`${text} text-2xl font-semibold`}>{value}</p>
-    </div>
   );
 }
 
