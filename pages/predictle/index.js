@@ -156,16 +156,6 @@ export default function Predictle() {
         .replace(/\s+/g, " ")
         .trim(),
   }));
-          .map((m) => ({
-            ...m,
-            question:
-              (m.question || m.title || m.condition_title || m.slug || "")
-                .replace(/^arch/i, "")
-                .replace(/^[^A-Za-z0-9]+/, "")
-                .replace(/\s+/g, " ")
-                .trim(),
-          }));
-
         // Deduplicate by first 60 chars of question
         const seen = new Set();
         const deduped = filtered.filter((m) => {
