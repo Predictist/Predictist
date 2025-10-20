@@ -67,8 +67,7 @@ export default function Predictle() {
         /* ---------- filtering ---------- */
         const filtered = data
           .filter((m) => {
-            const q =
-              m.question || m.title || m.condition_title || m.slug || "";
+            const q = m.question || m.title || m.condition_title || m.slug || "";
             const cleanQ = q
               .replace(/^arch/i, "")
               .replace(/^[^A-Za-z0-9]+/, "")
@@ -264,167 +263,7 @@ export default function Predictle() {
   );
 }
 
-/* =============== Daily Challenge =============== */
-function DailyChallenge({ dark, markets, loading, fetchError }) {
-  const TODAY = utcYYYYMMDD();
-  const [step, setStep] = useState(0);
-  const [grid, setGrid] = useState([]);
-  const [locked, setLocked] = useState(false);
-  const [feedback, setFeedback] = useState(null);
-
-  useEffect(() => {
-    const lastPlay = localStorage.getItem("predictle_daily_last");
-    if (lastPlay === TODAY) {
-      setLocked(true);
-      setGrid(JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]"));
-      setStep(parseInt(localStorage.getItem("predictle_daily_step") || "5"));
-    }
-  }, [TODAY]);
-
-  const todaysFive = useMemo(() => {
-    if (!markets.length) return [];
-    const idxs = pickDailyIndices(5, markets.length, TODAY);
-    return idxs.map((i) => markets[i]);
-  }, [markets, TODAY]);
-
-  const current = todaysFive[step];
-
-  const handleGuess = (choice) => {
-    if (!current || locked) return;
-    const tokens = current.tokens || [];
-    const yes = tokens.find((t) => /yes/i.test(t.outcome)) || tokens[0];
-    const no = tokens.find((t) => /no/i.test(t.outcome)) || tokens[1];
-    const yesP = Number(yes?.price ?? 0);
-    const noP = Number(no?.price ?? 0);
-    const correct = (choice === "YES" && yesP > noP) || (choice === "NO" && noP > yesP);
-
-    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes: yesP, no: noP } });
-    setGrid([...grid, correct ? "🟩" : "🟥"]);
-
-    if (correct) spawnConfetti(80);
-
-    localStorage.setItem("predictle_daily_last", TODAY);
-    localStorage.setItem("predictle_daily_grid", JSON.stringify([...grid, correct ? "🟩" : "🟥"]));
-
-    setTimeout(() => {
-      if (step + 1 >= 5) {
-        setLocked(true);
-        localStorage.setItem("predictle_daily_step", "5");
-      } else {
-        setStep(step + 1);
-        localStorage.setItem("predictle_daily_step", String(step + 1));
-      }
-      setFeedback(null);
-    }, 1200);
-  };
-
-  if (loading) return <Card dark={dark}><p>Loading today’s markets…</p></Card>;
-  if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!todaysFive.length) return <Card dark={dark}><p>No markets available.</p></Card>;
-
-  return (
-    <Card dark={dark}>
-      <h2 className="text-xl font-semibold mb-2">Daily Challenge — {step + 1}/5</h2>
-      <p className="text-gray-500 mb-4">{current.question}</p>
-      <div className="flex justify-center gap-4">
-        <Button onClick={() => handleGuess("YES")} color="green">YES</Button>
-        <Button onClick={() => handleGuess("NO")} color="red">NO</Button>
-      </div>
-    </Card>
-  );
-}
-
-/* =============== Free Play =============== */
-function FreePlay({ dark, markets, loading, fetchError }) {
-  const [current, setCurrent] = useState(null);
-  const [feedback, setFeedback] = useState(null);
-  const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
-
-  useEffect(() => {
-    const s = parseInt(localStorage.getItem("predictle_fp_score") || "0");
-    const k = parseInt(localStorage.getItem("predictle_fp_streak") || "0");
-    setScore(s);
-    setStreak(k);
-  }, []);
-
-  const freePlayMarkets = useMemo(
-    () => markets.filter((m) => !m.question.toLowerCase().includes("daily challenge")),
-    [markets]
-  );
-
-  useEffect(() => {
-    if (!loading && freePlayMarkets.length && !current)
-      setCurrent(freePlayMarkets[Math.floor(Math.random() * freePlayMarkets.length)]);
-  }, [loading, freePlayMarkets, current]);
-
-  const nextQuestion = () => {
-    setCurrent(freePlayMarkets[Math.floor(Math.random() * freePlayMarkets.length)]);
-    setFeedback(null);
-  };
-
-  const guess = (choice) => {
-    if (!current || feedback) return;
-    const tokens = current.tokens || [];
-    const yes = tokens.find((t) => /yes/i.test(t.outcome)) || tokens[0];
-    const no = tokens.find((t) => /no/i.test(t.outcome)) || tokens[1];
-    const yesP = Number(yes?.price ?? 0);
-    const noP = Number(no?.price ?? 0);
-    const correct = (choice === "YES" && yesP > noP) || (choice === "NO" && noP > yesP);
-
-    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes: yesP, no: noP } });
-    if (correct) {
-      spawnConfetti(60);
-      const ns = score + 1, nk = streak + 1;
-      setScore(ns); setStreak(nk);
-      localStorage.setItem("predictle_fp_score", String(ns));
-      localStorage.setItem("predictle_fp_streak", String(nk));
-    } else {
-      setStreak(0);
-      localStorage.setItem("predictle_fp_streak", "0");
-    }
-  };
-
-  if (loading) return <Card dark={dark}><p>Loading markets…</p></Card>;
-  if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!freePlayMarkets.length) return <Card dark={dark}><p>No markets available.</p></Card>;
-
-  return (
-    <Card dark={dark}>
-      <h2 className="text-xl font-semibold mb-2">Free Play</h2>
-      <div className="flex gap-6 mb-4">
-        <Stat label="Score" value={score} color="blue" />
-        <Stat label="Streak" value={streak} color="green" />
-      </div>
-      {current ? (
-        <>
-          <p className="text-lg mb-3">{current.question}</p>
-          {!feedback ? (
-            <div className="flex justify-center gap-4">
-              <Button onClick={() => guess("YES")} color="green">YES</Button>
-              <Button onClick={() => guess("NO")} color="red">NO</Button>
-            </div>
-          ) : (
-            <>
-              <p className="mt-5 text-lg font-semibold">
-                {feedback.type === "correct" ? "✅ Correct!" : "❌ Not this time!"}
-              </p>
-              <div className="flex gap-4 justify-center mt-2">
-                <Badge>YES: {(feedback.probs.yes * 100).toFixed(1)}%</Badge>
-                <Badge>NO: {(feedback.probs.no * 100).toFixed(1)}%</Badge>
-              </div>
-              <div className="flex justify-center mt-6">
-                <Button onClick={nextQuestion}>Next Question</Button>
-              </div>
-            </>
-          )}
-        </>
-      ) : <p>Picking question…</p>}
-    </Card>
-  );
-}
-
-/* -------------- UI Components -------------- */
+/* ------------------ Reusable UI ------------------ */
 function Card({ dark, children }) {
   return (
     <div
@@ -460,3 +299,11 @@ function Badge({ children }) {
 
 function Stat({ label, value, color }) {
   const text = color === "green" ? "text-green-500" : "text-blue-500";
+  return (
+    <div className="rounded-lg px-5 py-3 text-center border">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className={`${text} text-2xl font-semibold`}>{value}</p>
+    </div>
+  );
+}
+
