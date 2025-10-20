@@ -1,8 +1,6 @@
-// pages/predictle/index.js
 import { useEffect, useMemo, useState } from "react";
 
-/* ---------------------- Helper Utilities ---------------------- */
-
+/* -------------------- utilities -------------------- */
 const utcYYYYMMDD = () => new Date().toISOString().split("T")[0];
 
 function pickDailyIndices(count, poolLen, seedStr) {
@@ -24,6 +22,7 @@ function classNames(...c) {
   return c.filter(Boolean).join(" ");
 }
 
+/* -------------------- confetti -------------------- */
 function spawnConfetti(burst = 60) {
   const container = document.createElement("div");
   container.classList.add("confetti-container");
@@ -39,85 +38,108 @@ function spawnConfetti(burst = 60) {
   setTimeout(() => container.remove(), 4000);
 }
 
-/* --------------------------- Main ---------------------------- */
-
+/* -------------------- main page -------------------- */
 export default function Predictle() {
   const [dark, setDark] = useState(false);
   const [tab, setTab] = useState("daily");
   const [markets, setMarkets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
-
   const [tLeft, setTLeft] = useState({ h: "00", m: "00", s: "00" });
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("predictle_theme");
-    if (savedTheme === "dark") setDark(true);
+    const saved = localStorage.getItem("predictle_theme");
+    if (saved === "dark") setDark(true);
   }, []);
 
-  // Fetch Polymarket CLOB
   useEffect(() => {
+    let mounted = true;
     (async () => {
       setLoading(true);
       setFetchError("");
       try {
         const res = await fetch("/api/polymarket");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data = await res.json();
+
         console.log("✅ Raw markets:", data.length);
 
-        const filtered = data.filter((m) => {
-  const q =
-    m.question ||
-    m.title ||
-    m.condition_title ||
-    m.slug ||
-    "";
-  const cleanQ = q
-    .replace(/^arch/i, "")
-    .replace(/^[^A-Za-z0-9]+/, "")
-    .replace(/\s+/g, " ")
-    .trim();
+        /* ---------- filtering ---------- */
+        const filtered = data
+          .filter((m) => {
+            const q =
+              m.question || m.title || m.condition_title || m.slug || "";
+            const cleanQ = q
+              .replace(/^arch/i, "")
+              .replace(/^[^A-Za-z0-9]+/, "")
+              .replace(/\s+/g, " ")
+              .trim();
 
-  // Handle tokens properly — support different price formats
-  const tokens = Array.isArray(m.tokens) ? m.tokens : [];
-  const validTokens = tokens
-    .map((t) => {
-      if (typeof t.price === "number") return t.price;
-      if (t.price && typeof t.price.mid === "number") return t.price.mid;
-      if (typeof t.last_price === "number") return t.last_price;
-      return undefined;
-    })
-    .filter((p) => typeof p === "number");
+            const tokens = Array.isArray(m.tokens) ? m.tokens : [];
+            if (tokens.length < 2) return false;
 
-  // Handle possible timestamps
-  const createdAt = new Date(
-    m.created_at || m.start_date || m.createdAt || m.timestamp || Date.now()
-  );
-  const daysOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+            const hasYesNo =
+              tokens.some((t) => /yes/i.test(t.outcome || "")) &&
+              tokens.some((t) => /no/i.test(t.outcome || ""));
+            const isBinary =
+              hasYesNo ||
+              (tokens.length === 2 &&
+                tokens.every((t) => typeof t.outcome === "string"));
 
-  const isActive =
-    !m.closed &&
-    !m.resolved &&
-    !m.archived &&
-    !m.question?.toLowerCase().includes("test");
+            const createdAt = new Date(
+              m.created_at ||
+                m.start_date ||
+                m.createdAt ||
+                m.timestamp ||
+                Date.now()
+            );
+            const daysOld =
+              (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
 
-  return cleanQ.length > 15 && validTokens.length >= 2 && daysOld < 180 && isActive;
-});
+            const isActive =
+              !m.closed &&
+              !m.resolved &&
+              !m.archived &&
+              !q.toLowerCase().includes("test");
+
+            return (
+              isBinary &&
+              isActive &&
+              cleanQ.length > 10 &&
+              daysOld < 365
+            );
+          })
+          .map((m) => ({
+            ...m,
+            question:
+              (m.question ||
+                m.title ||
+                m.condition_title ||
+                m.slug ||
+                "")
+                .replace(/^arch/i, "")
+                .replace(/^[^A-Za-z0-9]+/, "")
+                .replace(/\s+/g, " ")
+                .trim(),
+          }));
 
         console.log("✅ Filtered markets:", filtered.length);
-        setMarkets(filtered);
-      } catch (err) {
-        console.error("❌ Error fetching markets:", err);
-        setFetchError("Failed to fetch markets.");
+        if (filtered.length > 0)
+          console.log("🧪 Example:", filtered[0].question);
+
+        if (mounted) setMarkets(filtered);
+      } catch (e) {
+        console.error("❌ Error fetching markets:", e);
+        if (mounted) setFetchError("Failed to fetch markets.");
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Countdown to midnight UTC
   useEffect(() => {
     const tick = () => {
       const now = new Date();
@@ -148,7 +170,6 @@ export default function Predictle() {
         dark ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900"
       )}
     >
-      {/* Header */}
       <div className="mx-auto max-w-4xl flex items-center justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Predictle</h1>
         <button
@@ -191,7 +212,6 @@ export default function Predictle() {
         </div>
       </div>
 
-      {/* Game Content */}
       <div className="mx-auto max-w-4xl mt-6">
         {tab === "daily" ? (
           <DailyChallenge dark={dark} markets={markets} loading={loading} fetchError={fetchError} />
@@ -200,7 +220,6 @@ export default function Predictle() {
         )}
       </div>
 
-      {/* UTC Countdown */}
       <div className="mx-auto max-w-4xl text-center mt-10 text-gray-500 text-sm">
         <p className="mb-1">🌍 Next Daily Challenge (00:00 UTC)</p>
         <div className="flex gap-2 text-2xl font-mono justify-center">
@@ -218,7 +237,6 @@ export default function Predictle() {
         </div>
       </div>
 
-      {/* Confetti styles */}
       <style jsx>{`
         .confetti-container {
           position: fixed;
@@ -238,20 +256,15 @@ export default function Predictle() {
           animation: fall 3s linear forwards;
         }
         @keyframes fall {
-          0% {
-            transform: translateY(-10vh) rotate(0deg);
-          }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-          }
+          0% { transform: translateY(-10vh) rotate(0deg); }
+          100% { transform: translateY(100vh) rotate(720deg); }
         }
       `}</style>
     </main>
   );
 }
 
-/* -------------------- Daily Challenge -------------------- */
-
+/* =============== Daily Challenge =============== */
 function DailyChallenge({ dark, markets, loading, fetchError }) {
   const TODAY = utcYYYYMMDD();
   const [step, setStep] = useState(0);
@@ -263,10 +276,8 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     const lastPlay = localStorage.getItem("predictle_daily_last");
     if (lastPlay === TODAY) {
       setLocked(true);
-      const savedGrid = JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]");
-      const savedStep = parseInt(localStorage.getItem("predictle_daily_step") || "5");
-      setGrid(savedGrid);
-      setStep(savedStep);
+      setGrid(JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]"));
+      setStep(parseInt(localStorage.getItem("predictle_daily_step") || "5"));
     }
   }, [TODAY]);
 
@@ -280,70 +291,50 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
 
   const handleGuess = (choice) => {
     if (!current || locked) return;
+    const tokens = current.tokens || [];
+    const yes = tokens.find((t) => /yes/i.test(t.outcome)) || tokens[0];
+    const no = tokens.find((t) => /no/i.test(t.outcome)) || tokens[1];
+    const yesP = Number(yes?.price ?? 0);
+    const noP = Number(no?.price ?? 0);
+    const correct = (choice === "YES" && yesP > noP) || (choice === "NO" && noP > yesP);
 
-    const tokens = Array.isArray(current.tokens) ? current.tokens : [];
-    const yesToken =
-      tokens.find((t) => t.outcome?.toUpperCase() === "YES") || tokens[0];
-    const noToken =
-      tokens.find((t) => t.outcome?.toUpperCase() === "NO") || tokens[1];
+    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes: yesP, no: noP } });
+    setGrid([...grid, correct ? "🟩" : "🟥"]);
 
-    const yes = Number(yesToken?.price ?? 0);
-    const no = Number(noToken?.price ?? 0);
-    const favored = yes > no ? "YES" : "NO";
-    const correct = choice === favored;
-
-    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes, no } });
-    const newGrid = [...grid, correct ? "🟩" : "🟥"];
-    setGrid(newGrid);
     if (correct) spawnConfetti(80);
 
     localStorage.setItem("predictle_daily_last", TODAY);
-    localStorage.setItem("predictle_daily_grid", JSON.stringify(newGrid));
+    localStorage.setItem("predictle_daily_grid", JSON.stringify([...grid, correct ? "🟩" : "🟥"]));
 
     setTimeout(() => {
-      const next = step + 1;
-      if (next >= 5) {
-        setStep(5);
-        localStorage.setItem("predictle_daily_step", "5");
+      if (step + 1 >= 5) {
         setLocked(true);
+        localStorage.setItem("predictle_daily_step", "5");
       } else {
-        setStep(next);
-        localStorage.setItem("predictle_daily_step", String(next));
+        setStep(step + 1);
+        localStorage.setItem("predictle_daily_step", String(step + 1));
       }
       setFeedback(null);
     }, 1200);
   };
 
-  if (loading) return <Card dark={dark}><p>Loading markets…</p></Card>;
+  if (loading) return <Card dark={dark}><p>Loading today’s markets…</p></Card>;
   if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
   if (!todaysFive.length) return <Card dark={dark}><p>No markets available.</p></Card>;
 
   return (
     <Card dark={dark}>
       <h2 className="text-xl font-semibold mb-2">Daily Challenge — {step + 1}/5</h2>
-      {current && <p className="mb-4">{current.question}</p>}
-      <div className="flex justify-center gap-4 mt-2">
+      <p className="text-gray-500 mb-4">{current.question}</p>
+      <div className="flex justify-center gap-4">
         <Button onClick={() => handleGuess("YES")} color="green">YES</Button>
         <Button onClick={() => handleGuess("NO")} color="red">NO</Button>
       </div>
-      {feedback && (
-        <div className="mt-5">
-          <p className="text-lg font-semibold">
-            {feedback.type === "correct" ? "✅ You were right!" : "❌ Not this time!"}
-          </p>
-          <div className="flex gap-4 justify-center mt-2">
-            <Badge>YES: {(feedback.probs.yes * 100).toFixed(1)}%</Badge>
-            <Badge>NO: {(feedback.probs.no * 100).toFixed(1)}%</Badge>
-          </div>
-        </div>
-      )}
-      <div className="flex justify-center gap-1 mt-6 text-2xl">{grid.map((g, i) => <span key={i}>{g}</span>)}</div>
     </Card>
   );
 }
 
-/* ---------------------- Free Play ---------------------- */
-
+/* =============== Free Play =============== */
 function FreePlay({ dark, markets, loading, fetchError }) {
   const [current, setCurrent] = useState(null);
   const [feedback, setFeedback] = useState(null);
@@ -357,40 +348,35 @@ function FreePlay({ dark, markets, loading, fetchError }) {
     setStreak(k);
   }, []);
 
-  useEffect(() => {
-    if (!loading && markets.length && !current) {
-      setCurrent(markets[Math.floor(Math.random() * markets.length)]);
-    }
-  }, [loading, markets, current]);
+  const freePlayMarkets = useMemo(
+    () => markets.filter((m) => !m.question.toLowerCase().includes("daily challenge")),
+    [markets]
+  );
 
-  const next = () => {
-    setCurrent(null);
+  useEffect(() => {
+    if (!loading && freePlayMarkets.length && !current)
+      setCurrent(freePlayMarkets[Math.floor(Math.random() * freePlayMarkets.length)]);
+  }, [loading, freePlayMarkets, current]);
+
+  const nextQuestion = () => {
+    setCurrent(freePlayMarkets[Math.floor(Math.random() * freePlayMarkets.length)]);
     setFeedback(null);
-    const m = markets[Math.floor(Math.random() * markets.length)];
-    setCurrent(m);
   };
 
   const guess = (choice) => {
     if (!current || feedback) return;
+    const tokens = current.tokens || [];
+    const yes = tokens.find((t) => /yes/i.test(t.outcome)) || tokens[0];
+    const no = tokens.find((t) => /no/i.test(t.outcome)) || tokens[1];
+    const yesP = Number(yes?.price ?? 0);
+    const noP = Number(no?.price ?? 0);
+    const correct = (choice === "YES" && yesP > noP) || (choice === "NO" && noP > yesP);
 
-    const tokens = Array.isArray(current.tokens) ? current.tokens : [];
-    const yesToken =
-      tokens.find((t) => t.outcome?.toUpperCase() === "YES") || tokens[0];
-    const noToken =
-      tokens.find((t) => t.outcome?.toUpperCase() === "NO") || tokens[1];
-
-    const yes = Number(yesToken?.price ?? 0);
-    const no = Number(noToken?.price ?? 0);
-    const correct = choice === (yes > no ? "YES" : "NO");
-
-    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes, no } });
-
+    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes: yesP, no: noP } });
     if (correct) {
       spawnConfetti(60);
-      const ns = score + 1;
-      const nk = streak + 1;
-      setScore(ns);
-      setStreak(nk);
+      const ns = score + 1, nk = streak + 1;
+      setScore(ns); setStreak(nk);
       localStorage.setItem("predictle_fp_score", String(ns));
       localStorage.setItem("predictle_fp_streak", String(nk));
     } else {
@@ -401,7 +387,7 @@ function FreePlay({ dark, markets, loading, fetchError }) {
 
   if (loading) return <Card dark={dark}><p>Loading markets…</p></Card>;
   if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!markets.length) return <Card dark={dark}><p>No markets available.</p></Card>;
+  if (!freePlayMarkets.length) return <Card dark={dark}><p>No markets available.</p></Card>;
 
   return (
     <Card dark={dark}>
@@ -412,7 +398,7 @@ function FreePlay({ dark, markets, loading, fetchError }) {
       </div>
       {current ? (
         <>
-          <p className="mb-3">{current.question}</p>
+          <p className="text-lg mb-3">{current.question}</p>
           {!feedback ? (
             <div className="flex justify-center gap-4">
               <Button onClick={() => guess("YES")} color="green">YES</Button>
@@ -428,20 +414,17 @@ function FreePlay({ dark, markets, loading, fetchError }) {
                 <Badge>NO: {(feedback.probs.no * 100).toFixed(1)}%</Badge>
               </div>
               <div className="flex justify-center mt-6">
-                <Button onClick={next}>Next Question</Button>
+                <Button onClick={nextQuestion}>Next Question</Button>
               </div>
             </>
           )}
         </>
-      ) : (
-        <p>Picking question…</p>
-      )}
+      ) : <p>Picking question…</p>}
     </Card>
   );
 }
 
-/* ---------------------- UI Components ---------------------- */
-
+/* -------------- UI Components -------------- */
 function Card({ dark, children }) {
   return (
     <div
@@ -455,7 +438,7 @@ function Card({ dark, children }) {
   );
 }
 
-function Button({ children, onClick, disabled, color = "blue" }) {
+function Button({ children, onClick, color = "blue" }) {
   const colorMap = {
     blue: "bg-blue-600 hover:bg-blue-700",
     green: "bg-green-600 hover:bg-green-700",
@@ -464,11 +447,7 @@ function Button({ children, onClick, disabled, color = "blue" }) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
-      className={classNames(
-        "text-white px-5 py-3 rounded-lg transition disabled:opacity-60",
-        colorMap[color]
-      )}
+      className={`${colorMap[color]} text-white px-5 py-3 rounded-lg transition`}
     >
       {children}
     </button>
@@ -481,11 +460,3 @@ function Badge({ children }) {
 
 function Stat({ label, value, color }) {
   const text = color === "green" ? "text-green-500" : "text-blue-500";
-  return (
-    <div className="rounded-lg px-5 py-3 text-center border">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={classNames("text-2xl font-semibold", text)}>{value}</p>
-    </div>
-  );
-}
-
