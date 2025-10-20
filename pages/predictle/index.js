@@ -174,6 +174,8 @@ export default function Predictle() {
 
         if (!mounted) return;
 
+console.log("Fetched:", data.length, "→ filtered:", filtered.length, "→ deduped:", deduped.length);
+
         if (!deduped.length) {
           retryCount += 1;
           const idx = Math.min(retryCount - 1, backoffMins.length - 1);
