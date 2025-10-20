@@ -660,6 +660,16 @@ function FreePlay({ dark, markets, loading, fetchError }) {
         <p className="text-red-500">{fetchError}</p>
       </Card>
     );
+    if (!current || !current.outcomes?.length) {
+  return (
+    <Card dark={dark}>
+      <p className="text-gray-500">Skipping invalid market…</p>
+      <div className="mt-3">
+        <Button onClick={() => setIdx((i) => (i + 1) % markets.length)}>Next</Button>
+      </div>
+    </Card>
+  );
+}
   if (!markets.length)
     return (
       <Card dark={dark}>
@@ -670,7 +680,7 @@ function FreePlay({ dark, markets, loading, fetchError }) {
       </Card>
     );
 
-  const [left, right] = current.outcomes;
+  const [left, right] = current?.outcomes || [{}, {}];
   return (
     <Card dark={dark}>
       <div className="flex items-center justify-between mb-3">
