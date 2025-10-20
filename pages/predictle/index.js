@@ -1,16 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 /* -------------------------------------------------------
    Utilities
 ------------------------------------------------------- */
 const utcYYYYMMDD = () => new Date().toISOString().split("T")[0];
-
-function classNames(...c) {
-  return c.filter(Boolean).join(" ");
-}
+const classNames = (...c) => c.filter(Boolean).join(" ");
+const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
 function pickDailyIndices(count, poolLen, seedStr) {
-  // Deterministic picker based on date seed
+  // Deterministic picker based on UTC date seed – same for everyone daily
   let seed = seedStr.split("-").reduce((s, p) => s + parseInt(p, 10), 0);
   const taken = new Set();
   const out = [];
@@ -25,10 +23,8 @@ function pickDailyIndices(count, poolLen, seedStr) {
   return out;
 }
 
-const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
-
 /* -------------------------------------------------------
-   Confetti (vanilla)
+   Confetti & Toast (no libs)
 ------------------------------------------------------- */
 function spawnConfetti(burst = 60) {
   const container = document.createElement("div");
@@ -45,9 +41,6 @@ function spawnConfetti(burst = 60) {
   setTimeout(() => container.remove(), 4000);
 }
 
-/* -------------------------------------------------------
-   Toast (no deps)
-------------------------------------------------------- */
 function showToast(message) {
   const el = document.createElement("div");
   el.className = "predictle-toast";
@@ -61,20 +54,49 @@ function showToast(message) {
 }
 
 /* -------------------------------------------------------
-   Main Page
+   Normalization helpers (works with Polymarket variants)
+------------------------------------------------------- */
+function getOutcomes(market) {
+  // Polymarket often returns either `outcomes[]` or `tokens[]`
+  const outcomes = Array.isArray(market.outcomes) ? market.outcomes : market.tokens || [];
+  // Normalize { name/outcome, price }
+  return outcomes
+    .map((o) => {
+      const name = o.name || o.outcome || o.ticker || "Option";
+      const p =
+        typeof o.price === "number"
+          ? o.price
+          : typeof o.last_price === "number"
+          ? o.last_price
+          : typeof o?.price?.mid === "number"
+          ? o.price.mid
+          : undefined;
+      return { name, price: typeof p === "number" ? p : undefined, raw: o };
+    })
+    .filter((o) => typeof o.price === "number");
+}
+
+function cleanQuestion(qRaw) {
+  return (qRaw || "")
+    .replace(/^arch/i, "")
+    .replace(/^[^A-Za-z0-9]+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* -------------------------------------------------------
+   Main Predictle Component
 ------------------------------------------------------- */
 export default function Predictle() {
   const [dark, setDark] = useState(false);
   const [tab, setTab] = useState("daily"); // 'daily' | 'free'
 
-  const [markets, setMarkets] = useState([]);
+  const [markets, setMarkets] = useState([]); // all normalized & deduped
   const [dailyMarkets, setDailyMarkets] = useState([]);
   const [freeMarkets, setFreeMarkets] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
-
-  // UTC countdown
   const [tLeft, setTLeft] = useState({ h: "00", m: "00", s: "00" });
 
   // Theme load
@@ -83,7 +105,7 @@ export default function Predictle() {
     if (saved === "dark") setDark(true);
   }, []);
 
-  // Market fetch with Option B backoff: 5 → 10 → 15 → steady 15
+  // Market fetch w/ Option B progressive backoff: 5 → 10 → 15 → steady 15
   useEffect(() => {
     let mounted = true;
     let retryTimer = null;
@@ -97,124 +119,74 @@ export default function Predictle() {
         setFetchError("");
 
         const res = await fetch("/api/polymarket");
-if (!res.ok) throw new Error(`HTTP ${res.status}`);
-const data = await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
 
-// Debug: show total markets before filtering
-console.log(`📦 Raw Polymarket markets: ${data.length}`);
+        // Filter: active + at least 2 priced outcomes, avoid test/archived, keep reasonably current
+        const filtered = data
+          .filter((m) => {
+            const qRaw = m.question || m.title || m.condition_title || m.slug || "";
+            const q = cleanQuestion(qRaw);
+            const os = getOutcomes(m);
+            if (os.length < 2) return false;
 
-// Step 1 — Filter out non-YES/NO, inactive, or irrelevant markets
-const filtered = data
-  .filter((m) => {
-    const qRaw = m.question || m.title || m.condition_title || m.slug || "";
-    const q = qRaw
-      .replace(/^arch/i, "")
-      .replace(/^[^A-Za-z0-9]+/, "")
-      .replace(/\s+/g, " ")
-      .trim();
+            const isActive =
+              !m.closed &&
+              !m.resolved &&
+              !m.archived &&
+              !qRaw.toLowerCase().includes("test") &&
+              !qRaw.toLowerCase().includes("archived");
 
-    // Step 2 — Normalize outcomes (Polymarket v3+)
-    const outcomes = Array.isArray(m.outcomes) ? m.outcomes : m.tokens || [];
-    if (!outcomes.length) return false;
+            // Heuristic recency: exclude obvious old seasons/years in title
+            const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(qRaw);
+            return isActive && !looksOld && q.length > 8;
+          })
+          .map((m) => {
+            const qRaw = m.question || m.title || m.condition_title || m.slug || "";
+            const q = cleanQuestion(qRaw);
+            const outcomes = getOutcomes(m)
+              // Prefer top-two by liquidity/volume if available, else by price desc
+              .sort((a, b) => (b.raw?.volume || 0) - (a.raw?.volume || 0) || b.price - a.price)
+              .slice(0, 2);
+            return { ...m, question: q, outcomes };
+          })
+          .filter((m) => m.outcomes.length === 2); // Guarantee exactly two for slider clarity
 
-    // Step 3 — Only allow explicit YES/NO markets
-    const yes = outcomes.find((t) => /yes/i.test(t.outcome || t.name || ""));
-    const no = outcomes.find((t) => /no/i.test(t.outcome || t.name || ""));
-    const hasYesNo = !!(yes && no);
-    if (!hasYesNo) return false;
+        // Deduplicate by question prefix
+        const seen = new Set();
+        const deduped = filtered.filter((m) => {
+          const key = m.question.toLowerCase().slice(0, 80);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
 
-    // Step 4 — Must have valid price data
-    const prices = outcomes
-      .map((t) => {
-        if (typeof t.price === "number") return t.price;
-        if (t.price && typeof t.price.mid === "number") return t.price.mid;
-        if (typeof t.last_price === "number") return t.last_price;
-        return undefined;
-      })
-      .filter((n) => typeof n === "number");
-    const hasPriceData = prices.length > 0;
+        if (!mounted) return;
 
-    // Step 5 — Must be active, not test/archived
-    const isActive =
-      !m.closed &&
-      !m.resolved &&
-      !m.archived &&
-      !qRaw.toLowerCase().includes("test") &&
-      !qRaw.toLowerCase().includes("archived");
-
-    // Step 6 — Exclude old/irrelevant questions (heuristic)
-    const isRecentEnough =
-      m.created_time &&
-      new Date(m.created_time).getFullYear() >= 2024; // skip 2022-2023
-
-    return (
-      hasYesNo &&
-      hasPriceData &&
-      isActive &&
-      isRecentEnough &&
-      q.length > 8
-    );
-  })
-  .map((m) => ({
-    ...m,
-    question:
-      (m.question || m.title || m.condition_title || m.slug || "")
-        .replace(/^arch/i, "")
-        .replace(/^[^A-Za-z0-9]+/, "")
-        .replace(/\s+/g, " ")
-        .trim(),
-  }));
-
-// Step 7 — Deduplicate by question text
-const seen = new Set();
-const deduped = filtered.filter((m) => {
-  const key = m.question.toLowerCase().slice(0, 80);
-  if (seen.has(key)) return false;
-  seen.add(key);
-  return true;
-});
-
-// Debug log for visibility
-console.log(
-  `✅ Filtered YES/NO markets: ${deduped.length}`,
-  deduped.slice(0, 5).map((m) => m.question)
-);
-
-// Step 8 — Handle retry or success
-if (!mounted) return;
-
-if (deduped.length === 0) {
-  retryCount += 1;
-  const idx = Math.min(retryCount - 1, backoffMins.length - 1);
-  const delayMin = backoffMins[idx];
-  const delayMs = delayMin * 60 * 1000;
-  setFetchError(`No valid markets yet. Retrying in ${delayMin} minutes…`);
-  if (manual) showToast(`No markets found • retry in ${delayMin} min`);
-  if (retryTimer) clearTimeout(retryTimer);
-  retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
-} else {
-  retryCount = 0;
-
-  // Split into Daily (60%) and Free (40%) pools
-  const shuffled = shuffle(deduped);
-  const splitIndex = Math.floor(shuffled.length * 0.6);
-  const dailyPool = shuffled.slice(0, splitIndex);
-  const freePool = shuffled.slice(splitIndex);
-
-  setMarkets(deduped);
-  setDailyMarkets(dailyPool);
-  setFreeMarkets(freePool);
-
-  if (manual) showToast(`✅ Updated • ${deduped.length} markets`);
-}
+        if (!deduped.length) {
+          retryCount += 1;
+          const idx = Math.min(retryCount - 1, backoffMins.length - 1);
+          const delayMs = backoffMins[idx] * 60_000;
+          setFetchError(`No valid markets yet. Retrying in ${backoffMins[idx]} minutes…`);
+          if (manual) showToast(`No markets found • retry in ${backoffMins[idx]} min`);
+          if (retryTimer) clearTimeout(retryTimer);
+          retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
+        } else {
+          retryCount = 0;
+          const shuffled = shuffle(deduped);
+          const splitIndex = Math.floor(shuffled.length * 0.6);
+          setMarkets(deduped);
+          setDailyMarkets(shuffled.slice(0, splitIndex));
+          setFreeMarkets(shuffled.slice(splitIndex));
+          if (manual) showToast(`✅ Updated • ${deduped.length} markets`);
+        }
       } catch (e) {
         if (!mounted) return;
         retryCount += 1;
         const idx = Math.min(retryCount - 1, backoffMins.length - 1);
-        const delayMin = backoffMins[idx];
-        const delayMs = delayMin * 60 * 1000;
-        setFetchError(`Fetch failed. Retrying in ${delayMin} minutes…`);
-        showToast(`❌ Fetch failed • retry in ${delayMin} min`);
+        const delayMs = backoffMins[idx] * 60_000;
+        setFetchError(`Fetch failed. Retrying in ${backoffMins[idx]} minutes…`);
+        showToast(`❌ Fetch failed • retry in ${backoffMins[idx]} min`);
         if (retryTimer) clearTimeout(retryTimer);
         retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
       } finally {
@@ -223,7 +195,6 @@ if (deduped.length === 0) {
     };
 
     fetchMarkets();
-    // Expose manual refresh
     window.refreshMarkets = () => fetchMarkets(true);
 
     return () => {
@@ -232,7 +203,7 @@ if (deduped.length === 0) {
     };
   }, []);
 
-  // UTC countdown
+  // UTC countdown (and triggers reset in DailyChallenge)
   useEffect(() => {
     const tick = () => {
       const now = new Date();
@@ -271,7 +242,7 @@ if (deduped.length === 0) {
             onClick={() => (window.refreshMarkets(), showToast("Refreshing markets…"))}
             className="px-3 py-1 border rounded-lg text-sm hover:bg-gray-700/10"
           >
-            🔁 Refresh Markets
+            🔁 Refresh
           </button>
           <button
             onClick={toggleTheme}
@@ -288,24 +259,16 @@ if (deduped.length === 0) {
           <button
             className={classNames(
               "px-4 py-2 text-sm font-medium",
-              tab === "daily"
-                ? dark
-                  ? "bg-gray-800"
-                  : "bg-white"
-                : "bg-transparent"
+              tab === "daily" ? (dark ? "bg-gray-800" : "bg-white") : "bg-transparent"
             )}
             onClick={() => setTab("daily")}
           >
-            Daily Challenge 🟩🟥
+            Daily Challenge 🟩🟨🟥
           </button>
           <button
             className={classNames(
               "px-4 py-2 text-sm font-medium border-l",
-              tab === "free"
-                ? dark
-                  ? "bg-gray-800"
-                  : "bg-white"
-                : "bg-transparent"
+              tab === "free" ? (dark ? "bg-gray-800" : "bg-white") : "bg-transparent"
             )}
             onClick={() => setTab("free")}
           >
@@ -401,16 +364,51 @@ if (deduped.length === 0) {
 }
 
 /* -------------------------------------------------------
-   Daily Challenge — 5 questions / day with share grid
+   Daily Challenge – 5 markets per UTC day (global seed)
+   Tiered scoring:
+   - ±10%  -> green  -> +1 point, streak++
+   - ±20%  -> yellow -> +0.5 point, streak++
+   - >20%  -> red    -> +0 point, streak reset
+   Emoji grid for share: 🟩🟨🟥
 ------------------------------------------------------- */
 function DailyChallenge({ dark, markets, loading, fetchError }) {
   const TODAY = utcYYYYMMDD();
-  const [step, setStep] = useState(0); // 0..4, then 5 = summary
-  const [grid, setGrid] = useState([]); // 🟩 / 🟥
+  const [step, setStep] = useState(0); // 0..4; 5 = summary
+  const [grid, setGrid] = useState([]); // 🟩🟨🟥
   const [locked, setLocked] = useState(false);
-  const [feedback, setFeedback] = useState(null); // {type:'correct'|'wrong', probs:{yes,no}}
+  const [feedback, setFeedback] = useState(null); // { zone, guess, actual }
+  const [guess, setGuess] = useState(50);
 
-  // One-play-per-day lock
+  const [dailyScore, setDailyScore] = useState(0);
+  const [dailyStreak, setDailyStreak] = useState(0);
+
+  // Auto-reset at UTC midnight
+  const lastDayRef = useRef(TODAY);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const nowDay = utcYYYYMMDD();
+      if (nowDay !== lastDayRef.current) {
+        lastDayRef.current = nowDay;
+        // Reset localStorage locks
+        localStorage.removeItem("predictle_daily_last");
+        localStorage.removeItem("predictle_daily_grid");
+        localStorage.removeItem("predictle_daily_step");
+        localStorage.setItem("predictle_daily_score", "0");
+        localStorage.setItem("predictle_daily_streak", "0");
+        setStep(0);
+        setGrid([]);
+        setLocked(false);
+        setFeedback(null);
+        setGuess(50);
+        setDailyScore(0);
+        setDailyStreak(0);
+        showToast("🔄 New daily challenge is live!");
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // One-play-per-day lock + scoreboard restore
   useEffect(() => {
     const lastPlay = localStorage.getItem("predictle_daily_last");
     if (lastPlay === TODAY) {
@@ -418,8 +416,13 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
       setGrid(JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]"));
       setStep(parseInt(localStorage.getItem("predictle_daily_step") || "5", 10));
     }
+    const sc = parseFloat(localStorage.getItem("predictle_daily_score") || "0");
+    const st = parseInt(localStorage.getItem("predictle_daily_streak") || "0", 10);
+    setDailyScore(sc);
+    setDailyStreak(st);
   }, [TODAY]);
 
+  // Pick 5 deterministic markets for today (global seed)
   const todaysFive = useMemo(() => {
     if (!markets.length) return [];
     const idxs = pickDailyIndices(5, markets.length, TODAY);
@@ -428,45 +431,75 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
 
   const current = todaysFive[step];
 
-  const handleGuess = (choice) => {
+  const judge = (guessPct, actualPct) => {
+    const diff = Math.abs(guessPct - actualPct);
+    if (diff <= 10) return "green";
+    if (diff <= 20) return "yellow";
+    return "red";
+  };
+
+  const handleSubmit = () => {
     if (!current || locked) return;
-    const outcomes = Array.isArray(current.outcomes)
-      ? current.outcomes
-      : current.tokens || [];
+    const [a, b] = current.outcomes;
+    const prices = current.outcomes.map((o) => o.price);
+    const actual = Math.round(prices[0] * 100); // Outcome A perspective (left label)
 
-    const yes = outcomes.find((o) => /yes/i.test(o.name || o.outcome || "")) || outcomes[0];
-    const no = outcomes.find((o) => /no/i.test(o.name || o.outcome || "")) || outcomes[1];
+    const zone = judge(guess, actual);
+    setFeedback({ zone, guess, actual });
 
-    const yesP = Number(yes?.price ?? 0);
-    const noP = Number(no?.price ?? 0);
-    const correct = (choice === "YES" && yesP > noP) || (choice === "NO" && noP > yesP);
+    // scoring & streaks
+    let newScore = dailyScore;
+    let newStreak = dailyStreak;
+    if (zone === "green") {
+      newScore += 1;
+      newStreak += 1;
+      spawnConfetti(100);
+    } else if (zone === "yellow") {
+      newScore += 0.5;
+      newStreak += 1;
+    } else {
+      newStreak = 0;
+    }
 
-    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes: yesP, no: noP } });
-    const newGrid = [...grid, correct ? "🟩" : "🟥"];
+    setDailyScore(newScore);
+    setDailyStreak(newStreak);
+    localStorage.setItem("predictle_daily_score", String(newScore));
+    localStorage.setItem("predictle_daily_streak", String(newStreak));
+
+    const emoji = zone === "green" ? "🟩" : zone === "yellow" ? "🟨" : "🟥";
+    const newGrid = [...grid, emoji];
     setGrid(newGrid);
 
-    if (correct) spawnConfetti(80);
-
-    // Persist progress + lock today
+    // Persist progress & lock for the day (after finishing 5)
     localStorage.setItem("predictle_daily_last", TODAY);
     localStorage.setItem("predictle_daily_grid", JSON.stringify(newGrid));
 
-    setTimeout(() => {
-      const nextStep = step + 1;
-      if (nextStep >= 5) {
-        setStep(5);
-        localStorage.setItem("predictle_daily_step", "5");
-        setLocked(true);
-      } else {
-        setStep(nextStep);
-        localStorage.setItem("predictle_daily_step", String(nextStep));
-      }
-      setFeedback(null);
-    }, 1200);
+    // Milestones confetti
+    if ([5, 10, 25, 50, 100].includes(newStreak)) {
+      spawnConfetti(200);
+      showToast(`🔥 ${newStreak} daily streak!`);
+    }
+  };
+
+  const nextQ = () => {
+    setFeedback(null);
+    setGuess(50);
+    const next = step + 1;
+    if (next >= 5) {
+      setStep(5);
+      setLocked(true);
+      localStorage.setItem("predictle_daily_step", "5");
+      showToast("✅ Daily complete!");
+    } else {
+      setStep(next);
+      localStorage.setItem("predictle_daily_step", String(next));
+    }
   };
 
   const share = () => {
-    const text = `📊 Predictle — ${TODAY}\n${grid.join("")}\n${grid.filter((g) => g === "🟩").length}/5 today\nPlay: https://predictist.io/predictle\n#Predictle #PredictionMarkets`;
+    const text = `📊 Predictle — ${TODAY}\n${grid.join("")}\nScore: ${dailyScore.toFixed(
+      1
+    )} | Streak: ${dailyStreak}\nPlay: https://predictist.io/predictle\n#Predictle #PredictionMarkets`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   };
@@ -475,24 +508,39 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     localStorage.removeItem("predictle_daily_last");
     localStorage.removeItem("predictle_daily_grid");
     localStorage.removeItem("predictle_daily_step");
+    localStorage.setItem("predictle_daily_score", "0");
+    localStorage.setItem("predictle_daily_streak", "0");
     setGrid([]);
     setStep(0);
     setLocked(false);
     setFeedback(null);
+    setGuess(50);
+    setDailyScore(0);
+    setDailyStreak(0);
   };
 
   if (loading) return <Card dark={dark}><p className="text-gray-500">Loading today’s markets…</p></Card>;
   if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!todaysFive.length) return <Card dark={dark}><p>No markets available for today.</p></Card>;
+  if (!todaysFive.length) {
+    return (
+      <Card dark={dark}>
+        <p className="text-gray-500">Preparing today’s challenge…</p>
+        <div className="mt-3">
+          <Button onClick={() => window.refreshMarkets?.()}>Try Refresh</Button>
+        </div>
+      </Card>
+    );
+  }
 
   if (locked && step === 5) {
     return (
       <Card dark={dark}>
-        <h2 className="text-xl font-semibold mb-2">Daily Challenge — Results</h2>
-        <div className="text-3xl mb-2">{grid.join("") || "🟩🟥🟩🟩🟥"}</div>
-        <p className="text-gray-500 mb-4">
-          {grid.filter((g) => g === "🟩").length}/5 correct today. Come back at 00:00 UTC!
-        </p>
+        <h2 className="text-xl font-semibold mb-2">Daily Results</h2>
+        <div className="text-3xl mb-2">{grid.join("") || "🟩🟨🟥🟩🟩"}</div>
+        <div className="flex gap-6 mb-4 justify-center">
+          <Stat label="Daily Score" value={dailyScore.toFixed(1)} color="blue" />
+          <Stat label="Daily Streak" value={dailyStreak} color="green" />
+        </div>
         <div className="flex gap-3 justify-center">
           <Button onClick={share}>Share Results</Button>
           <Button variant="ghost" onClick={resetDaily}>Reset (debug)</Button>
@@ -501,141 +549,238 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     );
   }
 
+  const [left, right] = current.outcomes; // left = perspective for slider %
   return (
     <Card dark={dark}>
-      <h2 className="text-xl font-semibold mb-2">Daily Challenge — {Math.min(step + 1, 5)} / 5</h2>
-      {current ? (
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold">Daily Challenge — {Math.min(step + 1, 5)} / 5</h2>
+        <div className="flex gap-4">
+          <Stat label="Score" value={dailyScore.toFixed(1)} color="blue" />
+          <Stat label="Streak" value={dailyStreak} color="green" />
+        </div>
+      </div>
+
+      <p className="text-gray-500 mb-4">{current.question}</p>
+
+      {/* Labels */}
+      <div className="flex justify-between text-sm text-gray-400 mb-2">
+        <span>{left?.name || "Outcome A"}</span>
+        <span>{right?.name || "Outcome B"}</span>
+      </div>
+
+      {/* Slider */}
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={guess}
+        onChange={(e) => setGuess(Number(e.target.value))}
+        className="w-full accent-blue-500"
+      />
+      <p className="text-center mt-2 font-medium">Your guess: {guess}%</p>
+
+      {/* Feedback */}
+      {feedback ? (
         <>
-          <p className="text-gray-500 mb-4">{current.question}</p>
-          <div className="flex justify-center gap-4 mt-2">
-            <Button onClick={() => handleGuess("YES")} disabled={!!feedback || locked} color="green">YES</Button>
-            <Button onClick={() => handleGuess("NO")} disabled={!!feedback || locked} color="red">NO</Button>
-          </div>
-          {feedback && (
-            <div className="mt-5">
-              <p className="text-lg font-semibold">
-                {feedback.type === "correct" ? "✅ You were right!" : "❌ Not this time!"}
-              </p>
-              <div className="flex gap-4 justify-center mt-2">
-                <Badge>YES: {(feedback.probs.yes * 100).toFixed(1)}%</Badge>
-                <Badge>NO: {(feedback.probs.no * 100).toFixed(1)}%</Badge>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-wrap justify-center gap-1 mt-6 text-2xl">
-            {grid.map((g, i) => <span key={i}>{g}</span>)}
+          <ComparisonBar guess={feedback.guess} actual={feedback.actual} />
+          <p className="mt-4 text-lg font-semibold text-center">
+            {feedback.zone === "green" ? "✅ Perfect!" : feedback.zone === "yellow" ? "🟨 Close!" : "❌ Off!"}{" "}
+            You guessed {feedback.guess}%, actual {feedback.actual}%.
+          </p>
+          <div className="flex justify-center mt-4">
+            <Button onClick={nextQ}>Next</Button>
           </div>
         </>
       ) : (
-        <p className="text-gray-400 italic">Preparing today’s question…</p>
+        <div className="flex justify-center mt-4">
+          <Button onClick={handleSubmit}>Submit Guess</Button>
+        </div>
       )}
     </Card>
   );
 }
 
 /* -------------------------------------------------------
-   Free Play — infinite; score + streak (localStorage)
+   Free Play – infinite; separate scoreboard (localStorage)
+   Tiered scoring identical to Daily.
 ------------------------------------------------------- */
 function FreePlay({ dark, markets, loading, fetchError }) {
-  const [current, setCurrent] = useState(null);
-  const [feedback, setFeedback] = useState(null); // {type, probs}
+  const [idx, setIdx] = useState(0);
+  const [guess, setGuess] = useState(50);
+  const [feedback, setFeedback] = useState(null);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
 
+  // restore scoreboard
   useEffect(() => {
-    const s = parseInt(localStorage.getItem("predictle_fp_score") || "0", 10);
+    const s = parseFloat(localStorage.getItem("predictle_fp_score") || "0");
     const k = parseInt(localStorage.getItem("predictle_fp_streak") || "0", 10);
     setScore(s);
     setStreak(k);
   }, []);
 
-  useEffect(() => {
-    if (!loading && markets.length && !current) {
-      setCurrent(markets[Math.floor(Math.random() * markets.length)]);
-    }
-  }, [loading, markets, current]);
-
-  const nextQuestion = () => {
-    setCurrent(null);
-    setFeedback(null);
-    const m = markets[Math.floor(Math.random() * markets.length)];
-    setCurrent(m);
+  const judge = (guessPct, actualPct) => {
+    const diff = Math.abs(guessPct - actualPct);
+    if (diff <= 10) return "green";
+    if (diff <= 20) return "yellow";
+    return "red";
   };
 
-  const guess = (choice) => {
+  const current = markets[idx];
+
+  const handleSubmit = () => {
     if (!current || feedback) return;
-    const outcomes = Array.isArray(current.outcomes)
-      ? current.outcomes
-      : current.tokens || [];
+    const prices = current.outcomes.map((o) => o.price);
+    const actual = Math.round(prices[0] * 100);
 
-    const yes = outcomes.find((o) => /yes/i.test(o.name || o.outcome || "")) || outcomes[0];
-    const no = outcomes.find((o) => /no/i.test(o.name || o.outcome || "")) || outcomes[1];
+    const zone = judge(guess, actual);
+    setFeedback({ zone, guess, actual });
 
-    const yesP = Number(yes?.price ?? 0);
-    const noP = Number(no?.price ?? 0);
-    const correct = (choice === "YES" && yesP > noP) || (choice === "NO" && noP > yesP);
-
-    setFeedback({ type: correct ? "correct" : "wrong", probs: { yes: yesP, no: noP } });
-
-    if (correct) {
-      spawnConfetti(60);
+    if (zone === "green") {
       const ns = score + 1;
       const nk = streak + 1;
       setScore(ns);
       setStreak(nk);
       localStorage.setItem("predictle_fp_score", String(ns));
       localStorage.setItem("predictle_fp_streak", String(nk));
-      if ([5, 10, 25, 50, 100].includes(nk)) spawnConfetti(150);
+      spawnConfetti(80);
+      if ([5, 10, 25, 50, 100].includes(nk)) {
+        spawnConfetti(200);
+        showToast(`🔥 Free Play streak ${nk}!`);
+      }
+    } else if (zone === "yellow") {
+      const ns = score + 0.5;
+      const nk = streak + 1;
+      setScore(ns);
+      setStreak(nk);
+      localStorage.setItem("predictle_fp_score", String(ns));
+      localStorage.setItem("predictle_fp_streak", String(nk));
     } else {
       setStreak(0);
       localStorage.setItem("predictle_fp_streak", "0");
     }
   };
 
+  const next = () => {
+    setFeedback(null);
+    setGuess(50);
+    if (!markets.length) return;
+    const nextIdx = Math.floor(Math.random() * markets.length);
+    setIdx(nextIdx);
+  };
+
   if (loading) return <Card dark={dark}><p className="text-gray-500">Loading markets…</p></Card>;
   if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!markets.length) return <Card dark={dark}><p>No markets available.</p></Card>;
+  if (!markets.length) {
+    return (
+      <Card dark={dark}>
+        <p className="text-gray-500">No markets available.</p>
+        <div className="mt-3">
+          <Button onClick={() => window.refreshMarkets?.()}>Try Refresh</Button>
+        </div>
+      </Card>
+    );
+  }
 
+  const [left, right] = current.outcomes;
   return (
     <Card dark={dark}>
-      <h2 className="text-xl font-semibold mb-2">Free Play</h2>
-      <div className="flex gap-6 mb-4">
-        <Stat label="Score" value={score} color="blue" />
-        <Stat label="Streak" value={streak} color="green" />
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold">Free Play</h2>
+        <div className="flex gap-4">
+          <Stat label="Score" value={score.toFixed(1)} color="blue" />
+          <Stat label="Streak" value={streak} color="green" />
+        </div>
       </div>
 
-      {current ? (
+      <p className="text-gray-500 mb-4">{current.question}</p>
+
+      <div className="flex justify-between text-sm text-gray-400 mb-2">
+        <span>{left?.name || "Outcome A"}</span>
+        <span>{right?.name || "Outcome B"}</span>
+      </div>
+
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={guess}
+        onChange={(e) => setGuess(Number(e.target.value))}
+        className="w-full accent-blue-500"
+      />
+      <p className="text-center mt-2 font-medium">Your guess: {guess}%</p>
+
+      {feedback ? (
         <>
-          <p className="text-lg font-medium mb-3">{current.question}</p>
-          {!feedback ? (
-            <div className="flex justify-center gap-4">
-              <Button onClick={() => guess("YES")} color="green">YES</Button>
-              <Button onClick={() => guess("NO")} color="red">NO</Button>
-            </div>
-          ) : (
-            <>
-              <p className="mt-5 text-lg font-semibold">
-                {feedback.type === "correct" ? "✅ Correct!" : "❌ Not this time!"}
-              </p>
-              <div className="flex gap-4 justify-center mt-2">
-                <Badge>YES: {(feedback.probs.yes * 100).toFixed(1)}%</Badge>
-                <Badge>NO: {(feedback.probs.no * 100).toFixed(1)}%</Badge>
-              </div>
-              <div className="flex justify-center mt-6">
-                <Button onClick={nextQuestion}>Next Question</Button>
-              </div>
-            </>
-          )}
+          <ComparisonBar guess={feedback.guess} actual={feedback.actual} />
+          <p className="mt-4 text-lg font-semibold text-center">
+            {feedback.zone === "green" ? "✅ Perfect!" : feedback.zone === "yellow" ? "🟨 Close!" : "❌ Off!"}{" "}
+            You guessed {feedback.guess}%, actual {feedback.actual}%.
+          </p>
+          <div className="flex justify-center mt-4">
+            <Button onClick={next}>Next</Button>
+          </div>
         </>
       ) : (
-        <p className="text-gray-500">Picking question…</p>
+        <div className="flex justify-center mt-4">
+          <Button onClick={handleSubmit}>Submit Guess</Button>
+        </div>
       )}
     </Card>
   );
 }
 
 /* -------------------------------------------------------
-   Tiny UI Primitives
+   Visual comparison bar: shows guess vs actual
+------------------------------------------------------- */
+function ComparisonBar({ guess, actual }) {
+  // clamp just in case
+  const g = Math.max(0, Math.min(100, guess));
+  const a = Math.max(0, Math.min(100, actual));
+  const diff = Math.abs(g - a);
+
+  let color = "#ef4444"; // red
+  if (diff <= 10) color = "#22c55e"; // green
+  else if (diff <= 20) color = "#eab308"; // yellow
+
+  return (
+    <div className="mt-5">
+      <div className="relative h-3 rounded-full bg-gray-300 dark:bg-gray-700 overflow-hidden">
+        {/* fill toward actual from both sides to emphasize target zone */}
+        <div
+          className="absolute top-0 bottom-0"
+          style={{
+            left: 0,
+            width: `${a}%`,
+            backgroundColor: color,
+            opacity: 0.3,
+            transition: "width .3s ease",
+          }}
+        />
+        {/* Guess marker */}
+        <div
+          className="absolute -top-1 h-5 w-1.5 bg-blue-600 rounded"
+          style={{ left: `calc(${g}% - 2px)` }}
+          title={`Your guess: ${g}%`}
+        />
+        {/* Actual marker */}
+        <div
+          className="absolute -top-1 h-5 w-1.5 bg-black dark:bg-white rounded"
+          style={{ left: `calc(${a}% - 2px)` }}
+          title={`Actual: ${a}%`}
+        />
+      </div>
+      <div className="flex justify-between text-xs text-gray-400 mt-1">
+        <span>0%</span>
+        <span>50%</span>
+        <span>100%</span>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------
+   Tiny UI primitives
 ------------------------------------------------------- */
 function Card({ dark, children }) {
   return (
@@ -669,14 +814,6 @@ function Button({ children, onClick, disabled, variant = "solid", color = "blue"
   );
 }
 
-function Badge({ children }) {
-  return (
-    <span className="px-3 py-1 rounded-full border text-sm">
-      {children}
-    </span>
-  );
-}
-
 function Stat({ label, value, color = "blue" }) {
   const text = color === "green" ? "text-green-500" : "text-blue-500";
   return (
@@ -686,5 +823,3 @@ function Stat({ label, value, color = "blue" }) {
     </div>
   );
 }
-
-
