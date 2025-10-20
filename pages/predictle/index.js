@@ -126,42 +126,42 @@ export default function Predictle() {
 
         // Filter valid markets only
         const filtered = data
-          .filter((m) => {
-            const qRaw = m.question || m.title || m.condition_title || m.slug || "";
-            const q = cleanQuestion(qRaw);
-            const os = getOutcomes(m);
-            if (os.length < 2) return false;
+  .map((m) => {
+    const qRaw = m.question || m.title || m.condition_title || m.slug || "";
+    const q = cleanQuestion(qRaw);
+    const os = getOutcomes(m);
 
-            const isActive =
-              !m.closed &&
-              !m.resolved &&
-              !m.archived &&
-              !qRaw.toLowerCase().includes("test") &&
-              !qRaw.toLowerCase().includes("archived");
+    return {
+      ...m,
+      question: q,
+      outcomes: os,
+    };
+  })
+  .filter((m) => {
+    const q = m.question || "";
+    const os = m.outcomes || [];
 
-            const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(qRaw);
-            return isActive && !looksOld && q.length > 8;
-          })
-          .map((m) => {
-            const qRaw = m.question || m.title || m.condition_title || m.slug || "";
-            const q = cleanQuestion(qRaw);
-            const outcomes = getOutcomes(m)
-              .sort((a, b) => (b.raw?.volume || 0) - (a.raw?.volume || 0) || b.price - a.price)
-              .slice(0, 2);
-            return { ...m, question: q, outcomes };
-          })
-          // ✅ Exclude markets with 0% or 100% (illiquid/old)
-          .filter((m) => {
-            const prices = m.outcomes.map((o) => o.price);
+    if (os.length < 2) return false;
 
-            // Exclude markets where both sides are invalid or frozen at 0/100
-            const hasNaN = prices.some((p) => typeof p !== "number" || isNaN(p));
-            const bothExtreme = prices.every((p) => p <= 0.001 || p >= 0.999);
+    // Skip obviously test/archived/resolved markets
+    const lowerQ = q.toLowerCase();
+    if (
+      lowerQ.includes("test") ||
+      lowerQ.includes("archived") ||
+      lowerQ.includes("resolve") ||
+      m.resolved ||
+      m.closed
+    )
+      return false;
 
-        // ✅ Valid if it has two outcomes and at least one side between 1%–99%
-            return m.outcomes.length === 2 && !hasNaN && !bothExtreme;
-       });
+    // Skip markets that look old (but allow recent years)
+    const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(q);
+    if (looksOld) return false;
 
+    // Ensure at least one valid (non-zero) price
+    const valid = m.outcomes.some((o) => o.price > 0 && o.price < 1);
+    return q.length > 8 && valid;
+  });
 
         // Deduplicate by question prefix
         const seen = new Set();
