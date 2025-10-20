@@ -97,11 +97,14 @@ export default function Predictle() {
         setFetchError("");
 
         const res = await fetch("/api/polymarket");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const data = await res.json();
 
-        // Filter YES/NO, active, recent; clean question; dedupe
-        const filtered = data
+// Debug: show total markets before filtering
+console.log(`📦 Raw Polymarket markets: ${data.length}`);
+
+// Step 1 — Filter out non-YES/NO, inactive, or irrelevant markets
+const filtered = data
   .filter((m) => {
     const qRaw = m.question || m.title || m.condition_title || m.slug || "";
     const q = qRaw
@@ -110,23 +113,17 @@ export default function Predictle() {
       .replace(/\s+/g, " ")
       .trim();
 
-    // Fallback for different polymarket structures
+    // Step 2 — Normalize outcomes (Polymarket v3+)
     const outcomes = Array.isArray(m.outcomes) ? m.outcomes : m.tokens || [];
     if (!outcomes.length) return false;
 
-    // Find outcomes that look binary YES/NO or have two clear options
-    const yes = outcomes.find((t) =>
-      /yes/i.test(t.outcome || t.name || "")
-    );
-    const no = outcomes.find((t) =>
-      /no/i.test(t.outcome || t.name || "")
-    );
+    // Step 3 — Only allow explicit YES/NO markets
+    const yes = outcomes.find((t) => /yes/i.test(t.outcome || t.name || ""));
+    const no = outcomes.find((t) => /no/i.test(t.outcome || t.name || ""));
     const hasYesNo = !!(yes && no);
+    if (!hasYesNo) return false;
 
-    // Accept markets that are binary even if not labeled "yes/no"
-    const isBinary = hasYesNo || outcomes.length === 2;
-
-    // Try to get any valid price data
+    // Step 4 — Must have valid price data
     const prices = outcomes
       .map((t) => {
         if (typeof t.price === "number") return t.price;
@@ -135,9 +132,9 @@ export default function Predictle() {
         return undefined;
       })
       .filter((n) => typeof n === "number");
-
     const hasPriceData = prices.length > 0;
 
+    // Step 5 — Must be active, not test/archived
     const isActive =
       !m.closed &&
       !m.resolved &&
@@ -145,7 +142,18 @@ export default function Predictle() {
       !qRaw.toLowerCase().includes("test") &&
       !qRaw.toLowerCase().includes("archived");
 
-    return isBinary && isActive && hasPriceData && q.length > 8;
+    // Step 6 — Exclude old/irrelevant questions (heuristic)
+    const isRecentEnough =
+      m.created_time &&
+      new Date(m.created_time).getFullYear() >= 2024; // skip 2022-2023
+
+    return (
+      hasYesNo &&
+      hasPriceData &&
+      isActive &&
+      isRecentEnough &&
+      q.length > 8
+    );
   })
   .map((m) => ({
     ...m,
@@ -156,41 +164,49 @@ export default function Predictle() {
         .replace(/\s+/g, " ")
         .trim(),
   }));
-        // Deduplicate by first 60 chars of question
-        const seen = new Set();
-        const deduped = filtered.filter((m) => {
-          const key = m.question.toLowerCase().slice(0, 60);
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
 
-        if (!mounted) return;
+// Step 7 — Deduplicate by question text
+const seen = new Set();
+const deduped = filtered.filter((m) => {
+  const key = m.question.toLowerCase().slice(0, 80);
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
 
-        if (deduped.length === 0) {
-          retryCount += 1;
-          const idx = Math.min(retryCount - 1, backoffMins.length - 1);
-          const delayMin = backoffMins[idx];
-          const delayMs = delayMin * 60 * 1000;
-          setFetchError(`No valid markets yet. Retrying in ${delayMin} minutes…`);
-          if (manual) showToast(`No markets found • retry in ${delayMin} min`);
-          if (retryTimer) clearTimeout(retryTimer);
-          retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
-        } else {
-          retryCount = 0;
+// Debug log for visibility
+console.log(
+  `✅ Filtered YES/NO markets: ${deduped.length}`,
+  deduped.slice(0, 5).map((m) => m.question)
+);
 
-          // Split into Daily (60%) and Free (40%) to avoid overlap
-          const shuffled = shuffle(deduped);
-          const splitIndex = Math.floor(shuffled.length * 0.6);
-          const dailyPool = shuffled.slice(0, splitIndex);
-          const freePool = shuffled.slice(splitIndex);
+// Step 8 — Handle retry or success
+if (!mounted) return;
 
-          setMarkets(deduped);
-          setDailyMarkets(dailyPool);
-          setFreeMarkets(freePool);
+if (deduped.length === 0) {
+  retryCount += 1;
+  const idx = Math.min(retryCount - 1, backoffMins.length - 1);
+  const delayMin = backoffMins[idx];
+  const delayMs = delayMin * 60 * 1000;
+  setFetchError(`No valid markets yet. Retrying in ${delayMin} minutes…`);
+  if (manual) showToast(`No markets found • retry in ${delayMin} min`);
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
+} else {
+  retryCount = 0;
 
-          if (manual) showToast(`✅ Updated • ${deduped.length} markets`);
-        }
+  // Split into Daily (60%) and Free (40%) pools
+  const shuffled = shuffle(deduped);
+  const splitIndex = Math.floor(shuffled.length * 0.6);
+  const dailyPool = shuffled.slice(0, splitIndex);
+  const freePool = shuffled.slice(splitIndex);
+
+  setMarkets(deduped);
+  setDailyMarkets(dailyPool);
+  setFreeMarkets(freePool);
+
+  if (manual) showToast(`✅ Updated • ${deduped.length} markets`);
+}
       } catch (e) {
         if (!mounted) return;
         retryCount += 1;
