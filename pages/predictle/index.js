@@ -68,33 +68,43 @@ export default function Predictle() {
         console.log("✅ Raw markets:", data.length);
 
         const filtered = data.filter((m) => {
-          const q =
-            m.question ||
-            m.title ||
-            m.condition_title ||
-            m.slug ||
-            "";
-          const cleanQ = q
-            .replace(/^arch/i, "")
-            .replace(/^[^A-Za-z0-9]+/, "")
-            .replace(/\s+/g, " ")
-            .trim();
+  const q =
+    m.question ||
+    m.title ||
+    m.condition_title ||
+    m.slug ||
+    "";
+  const cleanQ = q
+    .replace(/^arch/i, "")
+    .replace(/^[^A-Za-z0-9]+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
-          const tokens = Array.isArray(m.tokens) ? m.tokens : [];
-          const validTokens = tokens.filter((t) => typeof t.price === "number");
+  // Handle tokens properly — support different price formats
+  const tokens = Array.isArray(m.tokens) ? m.tokens : [];
+  const validTokens = tokens
+    .map((t) => {
+      if (typeof t.price === "number") return t.price;
+      if (t.price && typeof t.price.mid === "number") return t.price.mid;
+      if (typeof t.last_price === "number") return t.last_price;
+      return undefined;
+    })
+    .filter((p) => typeof p === "number");
 
-          const createdAt = new Date(m.created_at || m.createdAt || 0);
-          const daysOld = (Date.now() - createdAt) / (1000 * 60 * 60 * 24);
+  // Handle possible timestamps
+  const createdAt = new Date(
+    m.created_at || m.start_date || m.createdAt || m.timestamp || Date.now()
+  );
+  const daysOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
 
-          return (
-            cleanQ.length > 15 &&
-            validTokens.length >= 2 &&
-            daysOld < 90 &&
-            !m.resolved &&
-            !m.closed &&
-            !m.archived
-          );
-        });
+  const isActive =
+    !m.closed &&
+    !m.resolved &&
+    !m.archived &&
+    !m.question?.toLowerCase().includes("test");
+
+  return cleanQ.length > 15 && validTokens.length >= 2 && daysOld < 180 && isActive;
+});
 
         console.log("✅ Filtered markets:", filtered.length);
         setMarkets(filtered);
