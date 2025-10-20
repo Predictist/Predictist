@@ -125,17 +125,27 @@ export default function Predictle() {
         const data = await res.json();
 
         // Filter valid markets only
-        const filtered = data
-  .map((m) => {
-    const qRaw = m.question || m.title || m.condition_title || m.slug || "";
-    const q = cleanQuestion(qRaw);
-    const os = getOutcomes(m);
+        // Normalize and filter for Gamma event structure
+const filtered = data
+  .map((raw) => {
+    // Gamma events wrap markets; old Polymarket already had outcomes
+    const marketObj = Array.isArray(raw.markets) && raw.markets.length > 0
+      ? raw.markets[0] // first market per event
+      : raw;
 
-    return {
-      ...m,
-      question: q,
-      outcomes: os,
-    };
+    const qRaw =
+      raw.question ||
+      raw.title ||
+      raw.name ||
+      marketObj.question ||
+      marketObj.title ||
+      "";
+    const q = cleanQuestion(qRaw);
+
+    // Extract outcomes from either Gamma or legacy format
+    const outcomes = getOutcomes(marketObj);
+
+    return { ...raw, question: q, outcomes };
   })
   .filter((m) => {
     const q = m.question || "";
@@ -143,36 +153,25 @@ export default function Predictle() {
 
     if (os.length < 2) return false;
 
-    // Skip obviously test/archived/resolved markets
+    // Skip obviously bad/test markets
     const lowerQ = q.toLowerCase();
     if (
       lowerQ.includes("test") ||
-      lowerQ.includes("archived") ||
+      lowerQ.includes("archive") ||
       lowerQ.includes("resolve") ||
-      m.resolved ||
-      m.closed
+      m.closed ||
+      m.resolved
     )
       return false;
 
-    // Skip markets that look old (but allow recent years)
+    // Filter out very old stuff
     const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(q);
     if (looksOld) return false;
 
-    // Ensure at least one valid (non-zero) price
-    const valid = m.outcomes.some((o) => o.price > 0 && o.price < 1);
+    // Require at least one valid price between 0–1
+    const valid = os.some((o) => o.price > 0 && o.price < 1);
     return q.length > 8 && valid;
   });
-
-        // Deduplicate by question prefix
-        const seen = new Set();
-        const deduped = filtered.filter((m) => {
-          const key = m.question.toLowerCase().slice(0, 80);
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-
-        if (!mounted) return;
 
 console.log("Fetched:", data.length, "→ filtered:", filtered.length, "→ deduped:", deduped.length);
 
