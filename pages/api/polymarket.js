@@ -1,28 +1,41 @@
 // pages/api/polymarket.js
 export default async function handler(req, res) {
   try {
-    // Cache-busting timestamp to force fresh fetch each time
-    const url = `https://clob.polymarket.com/markets?limit=1000&_=${Date.now()}`;
+    let markets = [];
+    let cursor = null;
+    const limit = 500; // maximum allowed
 
-    const r = await fetch(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
+    // Loop through pagination until we have enough markets or no more data
+    for (let i = 0; i < 3; i++) { // 3 pages = up to ~1500 markets
+      const url = new URL("https://clob.polymarket.com/markets");
+      url.searchParams.set("limit", limit);
+      if (cursor) url.searchParams.set("cursor", cursor);
+      url.searchParams.set("_", Date.now()); // cache-busting
 
-    if (!r.ok) {
-      return res.status(r.status).json({ error: `Polymarket returned ${r.status}` });
+      const r = await fetch(url, {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!r.ok) {
+        console.error("Polymarket fetch failed:", r.status);
+        return res.status(r.status).json({ error: `Polymarket returned ${r.status}` });
+      }
+
+      const body = await r.json();
+      const pageData = Array.isArray(body)
+        ? body
+        : Array.isArray(body?.data)
+        ? body.data
+        : [];
+
+      markets = markets.concat(pageData);
+
+      if (!body?.next_cursor) break;
+      cursor = body.next_cursor;
     }
 
-    const body = await r.json();
-
-    // Normalize: Polymarket returns { data: [], next_cursor, ... }
-    const markets = Array.isArray(body)
-      ? body
-      : Array.isArray(body?.data)
-      ? body.data
-      : [];
-
-    // Filter out any obvious junk here so the front end doesn't waste time
+    // Basic cleanup
     const cleaned = markets.filter(
       (m) =>
         m &&
@@ -38,5 +51,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Server error fetching Polymarket markets" });
   }
 }
+
 
 
