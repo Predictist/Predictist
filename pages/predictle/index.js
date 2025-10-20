@@ -102,35 +102,60 @@ export default function Predictle() {
 
         // Filter YES/NO, active, recent; clean question; dedupe
         const filtered = data
-          .filter((m) => {
-            const qRaw = m.question || m.title || m.condition_title || m.slug || "";
-            const q = qRaw
-              .replace(/^arch/i, "")
-              .replace(/^[^A-Za-z0-9]+/, "")
-              .replace(/\s+/g, " ")
-              .trim();
+  .filter((m) => {
+    const qRaw = m.question || m.title || m.condition_title || m.slug || "";
+    const q = qRaw
+      .replace(/^arch/i, "")
+      .replace(/^[^A-Za-z0-9]+/, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-            const tokens = Array.isArray(m.tokens) ? m.tokens : [];
-            if (tokens.length < 2) return false;
+    // Fallback for different polymarket structures
+    const outcomes = Array.isArray(m.outcomes) ? m.outcomes : m.tokens || [];
+    if (!outcomes.length) return false;
 
-            const yes = tokens.find((t) =>
-              /yes/i.test(t.outcome || t.name || "")
-            );
-            const no = tokens.find((t) =>
-              /no/i.test(t.outcome || t.name || "")
-            );
-            const hasYesNo = !!(yes && no);
+    // Find outcomes that look binary YES/NO or have two clear options
+    const yes = outcomes.find((t) =>
+      /yes/i.test(t.outcome || t.name || "")
+    );
+    const no = outcomes.find((t) =>
+      /no/i.test(t.outcome || t.name || "")
+    );
+    const hasYesNo = !!(yes && no);
 
-            const createdAt = new Date(
-              m.created_at || m.start_date || m.createdAt || m.timestamp || Date.now()
-            );
-            const daysOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    // Accept markets that are binary even if not labeled "yes/no"
+    const isBinary = hasYesNo || outcomes.length === 2;
 
-            const isActive =
-              !m.closed && !m.resolved && !m.archived && !qRaw.toLowerCase().includes("test");
+    // Try to get any valid price data
+    const prices = outcomes
+      .map((t) => {
+        if (typeof t.price === "number") return t.price;
+        if (t.price && typeof t.price.mid === "number") return t.price.mid;
+        if (typeof t.last_price === "number") return t.last_price;
+        return undefined;
+      })
+      .filter((n) => typeof n === "number");
 
-            return hasYesNo && isActive && q.length > 10 && daysOld < 365;
-          })
+    const hasPriceData = prices.length > 0;
+
+    const isActive =
+      !m.closed &&
+      !m.resolved &&
+      !m.archived &&
+      !qRaw.toLowerCase().includes("test") &&
+      !qRaw.toLowerCase().includes("archived");
+
+    return isBinary && isActive && hasPriceData && q.length > 8;
+  })
+  .map((m) => ({
+    ...m,
+    question:
+      (m.question || m.title || m.condition_title || m.slug || "")
+        .replace(/^arch/i, "")
+        .replace(/^[^A-Za-z0-9]+/, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+  }));
           .map((m) => ({
             ...m,
             question:
