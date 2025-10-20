@@ -106,7 +106,7 @@ export default function Predictle() {
   }, []);
 
   /* -----------------------------------------------
-     Market Fetch with Progressive Backoff
+     Market Fetch with Progressive Backoff (fixed)
   ----------------------------------------------- */
   useEffect(() => {
     let mounted = true;
@@ -124,62 +124,60 @@ export default function Predictle() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // Filter valid markets only
-        // Normalize and filter for Gamma event structure
-const filtered = data
-  .map((raw) => {
-    // Gamma events wrap markets; old Polymarket already had outcomes
-    const marketObj = Array.isArray(raw.markets) && raw.markets.length > 0
-      ? raw.markets[0] // first market per event
-      : raw;
+        // ✅ Normalize Gamma API data
+        const normalized = data.flatMap((event) => {
+          if (Array.isArray(event.markets) && event.markets.length > 0) {
+            return event.markets.map((m) => ({
+              ...m,
+              question:
+                event.title || event.name || m.title || m.question || "",
+              outcomes: getOutcomes(m),
+              id: m.id || event.id,
+            }));
+          }
+          return {
+            ...event,
+            question: event.title || event.name || event.question || "",
+            outcomes: getOutcomes(event),
+          };
+        });
 
-    const qRaw =
-      raw.question ||
-      raw.title ||
-      raw.name ||
-      marketObj.question ||
-      marketObj.title ||
-      "";
-    const q = cleanQuestion(qRaw);
+        // ✅ Filter valid markets
+        const filtered = normalized.filter((m) => {
+          const q = cleanQuestion(m.question);
+          const os = m.outcomes || [];
+          if (os.length !== 2) return false; // only YES/NO
+          if (os.some((o) => o.price <= 0 || o.price >= 1)) return false;
+          const lower = q.toLowerCase();
+          if (
+            lower.includes("test") ||
+            lower.includes("archive") ||
+            lower.includes("resolve")
+          )
+            return false;
+          const old = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(q);
+          return q.length > 8 && !old;
+        });
 
-    // Extract outcomes from either Gamma or legacy format
-    const outcomes = getOutcomes(marketObj);
+        // ✅ Deduplicate
+        const seen = new Set();
+        const deduped = filtered.filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
 
-    return { ...raw, question: q, outcomes };
-  })
-  .filter((m) => {
-    const q = m.question || "";
-    const os = m.outcomes || [];
-
-    if (os.length < 2) return false;
-
-    // Skip obviously bad/test markets
-    const lowerQ = q.toLowerCase();
-    if (
-      lowerQ.includes("test") ||
-      lowerQ.includes("archive") ||
-      lowerQ.includes("resolve") ||
-      m.closed ||
-      m.resolved
-    )
-      return false;
-
-    // Filter out very old stuff
-    const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(q);
-    if (looksOld) return false;
-
-    // Require at least one valid price between 0–1
-    const valid = os.some((o) => o.price > 0 && o.price < 1);
-    return q.length > 8 && valid;
-  });
-
-console.log("Fetched:", data.length, "→ filtered:", filtered.length, "→ deduped:", deduped.length);
+        console.log(
+          `Fetched: ${data.length} → filtered: ${filtered.length} → deduped: ${deduped.length}`
+        );
 
         if (!deduped.length) {
           retryCount += 1;
           const idx = Math.min(retryCount - 1, backoffMins.length - 1);
           const delayMs = backoffMins[idx] * 60_000;
-          setFetchError(`No valid markets yet. Retrying in ${backoffMins[idx]} minutes…`);
+          setFetchError(
+            `No valid markets yet. Retrying in ${backoffMins[idx]} minutes…`
+          );
           if (retryTimer) clearTimeout(retryTimer);
           retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
         } else {
@@ -369,6 +367,13 @@ console.log("Fetched:", data.length, "→ filtered:", filtered.length, "→ dedu
     </main>
   );
 }
+
+/* -------------------------------------------------------
+   DailyChallenge + FreePlay + ComparisonBar + Button + Card
+------------------------------------------------------- */
+
+// ✅ Keep all your existing DailyChallenge, FreePlay, ComparisonBar, Button, Stat, Card code BELOW this point exactly as-is.
+
 
 /* -------------------------------------------------------
    Daily Challenge (patched restore + reset)
