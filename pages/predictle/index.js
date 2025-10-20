@@ -549,7 +549,7 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     );
   }
 
-  const [left, right] = current.outcomes; // left = perspective for slider %
+  const [left, right] = current?.outcomes || [{}, {}]; // left = perspective for slider %
   return (
     <Card dark={dark}>
       <div className="flex items-center justify-between mb-3">
