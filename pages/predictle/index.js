@@ -153,9 +153,11 @@ export default function Predictle() {
           // ✅ Exclude markets with 0% or 100% (illiquid/old)
           .filter((m) => {
             const prices = m.outcomes.map((o) => o.price);
-            const validPrices = prices.every((p) => p > 0.05 && p < 0.95);
-            return m.outcomes.length === 2 && validPrices;
-          });
+  // Exclude only if BOTH outcomes are extreme or invalid
+            const bothExtreme = prices.every((p) => p <= 0.005 || p >= 0.995);
+            const bothInvalid = prices.some((p) => typeof p !== "number" || isNaN(p));
+            return m.outcomes.length === 2 && !bothExtreme && !bothInvalid;
+        });
 
         // Deduplicate by question prefix
         const seen = new Set();
