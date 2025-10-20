@@ -152,15 +152,15 @@ export default function Predictle() {
           })
           // ✅ Exclude markets with 0% or 100% (illiquid/old)
           .filter((m) => {
-  const prices = m.outcomes.map((o) => o.price);
+            const prices = m.outcomes.map((o) => o.price);
 
-  // Exclude markets where both sides are invalid or frozen at 0/100
-  const hasNaN = prices.some((p) => typeof p !== "number" || isNaN(p));
-  const bothExtreme = prices.every((p) => p <= 0.001 || p >= 0.999);
+            // Exclude markets where both sides are invalid or frozen at 0/100
+            const hasNaN = prices.some((p) => typeof p !== "number" || isNaN(p));
+            const bothExtreme = prices.every((p) => p <= 0.001 || p >= 0.999);
 
-  // ✅ Valid if it has two outcomes and at least one side between 1%–99%
-  return m.outcomes.length === 2 && !hasNaN && !bothExtreme;
-});
+        // ✅ Valid if it has two outcomes and at least one side between 1%–99%
+            return m.outcomes.length === 2 && !hasNaN && !bothExtreme;
+       });
 
 
         // Deduplicate by question prefix
