@@ -8,7 +8,6 @@ const classNames = (...c) => c.filter(Boolean).join(" ");
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
 function pickDailyIndices(count, poolLen, seedStr) {
-  // Deterministic picker based on UTC date seed – same for everyone daily
   let seed = seedStr.split("-").reduce((s, p) => s + parseInt(p, 10), 0);
   const taken = new Set();
   const out = [];
@@ -54,12 +53,13 @@ function showToast(message) {
 }
 
 /* -------------------------------------------------------
-   Normalization helpers (works with Polymarket variants)
+   Normalization helpers
 ------------------------------------------------------- */
 function getOutcomes(market) {
-  // Polymarket often returns either `outcomes[]` or `tokens[]`
-  const outcomes = Array.isArray(market.outcomes) ? market.outcomes : market.tokens || [];
-  // Normalize { name/outcome, price }
+  const outcomes = Array.isArray(market.outcomes)
+    ? market.outcomes
+    : market.tokens || [];
+
   return outcomes
     .map((o) => {
       const name = o.name || o.outcome || o.ticker || "Option";
@@ -89,9 +89,9 @@ function cleanQuestion(qRaw) {
 ------------------------------------------------------- */
 export default function Predictle() {
   const [dark, setDark] = useState(false);
-  const [tab, setTab] = useState("daily"); // 'daily' | 'free'
+  const [tab, setTab] = useState("daily");
 
-  const [markets, setMarkets] = useState([]); // all normalized & deduped
+  const [markets, setMarkets] = useState([]);
   const [dailyMarkets, setDailyMarkets] = useState([]);
   const [freeMarkets, setFreeMarkets] = useState([]);
 
@@ -99,13 +99,15 @@ export default function Predictle() {
   const [fetchError, setFetchError] = useState("");
   const [tLeft, setTLeft] = useState({ h: "00", m: "00", s: "00" });
 
-  // Theme load
+  // Theme
   useEffect(() => {
     const saved = localStorage.getItem("predictle_theme");
     if (saved === "dark") setDark(true);
   }, []);
 
-  // Market fetch w/ Option B progressive backoff: 5 → 10 → 15 → steady 15
+  /* -----------------------------------------------
+     Market Fetch with Progressive Backoff
+  ----------------------------------------------- */
   useEffect(() => {
     let mounted = true;
     let retryTimer = null;
@@ -122,7 +124,7 @@ export default function Predictle() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // Filter: active + at least 2 priced outcomes, avoid test/archived, keep reasonably current
+        // Filter valid markets only
         const filtered = data
           .filter((m) => {
             const qRaw = m.question || m.title || m.condition_title || m.slug || "";
@@ -137,7 +139,6 @@ export default function Predictle() {
               !qRaw.toLowerCase().includes("test") &&
               !qRaw.toLowerCase().includes("archived");
 
-            // Heuristic recency: exclude obvious old seasons/years in title
             const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(qRaw);
             return isActive && !looksOld && q.length > 8;
           })
@@ -145,12 +146,16 @@ export default function Predictle() {
             const qRaw = m.question || m.title || m.condition_title || m.slug || "";
             const q = cleanQuestion(qRaw);
             const outcomes = getOutcomes(m)
-              // Prefer top-two by liquidity/volume if available, else by price desc
               .sort((a, b) => (b.raw?.volume || 0) - (a.raw?.volume || 0) || b.price - a.price)
               .slice(0, 2);
             return { ...m, question: q, outcomes };
           })
-          .filter((m) => m.outcomes.length === 2); // Guarantee exactly two for slider clarity
+          // ✅ Exclude markets with 0% or 100% (illiquid/old)
+          .filter((m) => {
+            const prices = m.outcomes.map((o) => o.price);
+            const validPrices = prices.every((p) => p > 0.05 && p < 0.95);
+            return m.outcomes.length === 2 && validPrices;
+          });
 
         // Deduplicate by question prefix
         const seen = new Set();
@@ -168,7 +173,6 @@ export default function Predictle() {
           const idx = Math.min(retryCount - 1, backoffMins.length - 1);
           const delayMs = backoffMins[idx] * 60_000;
           setFetchError(`No valid markets yet. Retrying in ${backoffMins[idx]} minutes…`);
-          if (manual) showToast(`No markets found • retry in ${backoffMins[idx]} min`);
           if (retryTimer) clearTimeout(retryTimer);
           retryTimer = setTimeout(() => fetchMarkets(false), delayMs);
         } else {
@@ -203,7 +207,9 @@ export default function Predictle() {
     };
   }, []);
 
-  // UTC countdown (and triggers reset in DailyChallenge)
+  /* -----------------------------------------------
+     UTC Countdown
+  ----------------------------------------------- */
   useEffect(() => {
     const tick = () => {
       const now = new Date();
@@ -280,23 +286,13 @@ export default function Predictle() {
       {/* Content */}
       <div className="mx-auto max-w-4xl mt-6">
         {tab === "daily" ? (
-          <DailyChallenge
-            dark={dark}
-            markets={dailyMarkets}
-            loading={loading}
-            fetchError={fetchError}
-          />
+          <DailyChallenge dark={dark} markets={dailyMarkets} loading={loading} fetchError={fetchError} />
         ) : (
-          <FreePlay
-            dark={dark}
-            markets={freeMarkets}
-            loading={loading}
-            fetchError={fetchError}
-          />
+          <FreePlay dark={dark} markets={freeMarkets} loading={loading} fetchError={fetchError} />
         )}
       </div>
 
-      {/* UTC countdown footer */}
+      {/* Countdown footer */}
       <div className="mx-auto max-w-4xl text-center mt-10 text-gray-500 text-sm">
         <p className="mb-1">🌍 Next Daily Challenge (00:00 UTC)</p>
         <div className="flex gap-2 text-2xl font-mono justify-center">
@@ -334,8 +330,12 @@ export default function Predictle() {
           animation: fall 3s linear forwards;
         }
         @keyframes fall {
-          0% { transform: translateY(-10vh) rotate(0deg); }
-          100% { transform: translateY(100vh) rotate(720deg); }
+          0% {
+            transform: translateY(-10vh) rotate(0deg);
+          }
+          100% {
+            transform: translateY(100vh) rotate(720deg);
+          }
         }
       `}</style>
       <style jsx global>{`
@@ -349,10 +349,10 @@ export default function Predictle() {
           padding: 10px 14px;
           border-radius: 10px;
           font-size: 14px;
-          box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
           opacity: 0;
           z-index: 9999;
-          transition: transform .2s ease, opacity .2s ease;
+          transition: transform 0.2s ease, opacity 0.2s ease;
         }
         .predictle-toast.show {
           transform: translateX(-50%) translateY(0);
@@ -364,37 +364,28 @@ export default function Predictle() {
 }
 
 /* -------------------------------------------------------
-   Daily Challenge – 5 markets per UTC day (global seed)
-   Tiered scoring:
-   - ±10%  -> green  -> +1 point, streak++
-   - ±20%  -> yellow -> +0.5 point, streak++
-   - >20%  -> red    -> +0 point, streak reset
-   Emoji grid for share: 🟩🟨🟥
+   Daily Challenge (patched restore + reset)
 ------------------------------------------------------- */
 function DailyChallenge({ dark, markets, loading, fetchError }) {
   const TODAY = utcYYYYMMDD();
-  const [step, setStep] = useState(0); // 0..4; 5 = summary
-  const [grid, setGrid] = useState([]); // 🟩🟨🟥
+  const [step, setStep] = useState(0);
+  const [grid, setGrid] = useState([]);
   const [locked, setLocked] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { zone, guess, actual }
+  const [feedback, setFeedback] = useState(null);
   const [guess, setGuess] = useState(50);
 
   const [dailyScore, setDailyScore] = useState(0);
   const [dailyStreak, setDailyStreak] = useState(0);
 
-  // Auto-reset at UTC midnight
   const lastDayRef = useRef(TODAY);
+
+  // Auto-reset at UTC midnight
   useEffect(() => {
     const id = setInterval(() => {
       const nowDay = utcYYYYMMDD();
       if (nowDay !== lastDayRef.current) {
         lastDayRef.current = nowDay;
-        // Reset localStorage locks
-        localStorage.removeItem("predictle_daily_last");
-        localStorage.removeItem("predictle_daily_grid");
-        localStorage.removeItem("predictle_daily_step");
-        localStorage.setItem("predictle_daily_score", "0");
-        localStorage.setItem("predictle_daily_streak", "0");
+        localStorage.clear();
         setStep(0);
         setGrid([]);
         setLocked(false);
@@ -408,21 +399,24 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     return () => clearInterval(id);
   }, []);
 
-  // One-play-per-day lock + scoreboard restore
+  // Restore progress AFTER markets loaded
   useEffect(() => {
     const lastPlay = localStorage.getItem("predictle_daily_last");
-    if (lastPlay === TODAY) {
-      setLocked(true);
-      setGrid(JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]"));
-      setStep(parseInt(localStorage.getItem("predictle_daily_step") || "5", 10));
-    }
     const sc = parseFloat(localStorage.getItem("predictle_daily_score") || "0");
     const st = parseInt(localStorage.getItem("predictle_daily_streak") || "0", 10);
     setDailyScore(sc);
     setDailyStreak(st);
-  }, [TODAY]);
 
-  // Pick 5 deterministic markets for today (global seed)
+    if (markets.length && lastPlay === TODAY) {
+      const savedStep = parseInt(localStorage.getItem("predictle_daily_step") || "0", 10);
+      const savedGrid = JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]");
+      const clampedStep = Math.min(savedStep, 4);
+      setStep(clampedStep);
+      setGrid(savedGrid);
+      setLocked(savedStep >= 5);
+    }
+  }, [markets, TODAY]);
+
   const todaysFive = useMemo(() => {
     if (!markets.length) return [];
     const idxs = pickDailyIndices(5, markets.length, TODAY);
@@ -440,14 +434,10 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
 
   const handleSubmit = () => {
     if (!current || locked) return;
-    const [a, b] = current.outcomes;
-    const prices = current.outcomes.map((o) => o.price);
-    const actual = Math.round(prices[0] * 100); // Outcome A perspective (left label)
-
+    const actual = Math.round(current.outcomes[0].price * 100);
     const zone = judge(guess, actual);
     setFeedback({ zone, guess, actual });
 
-    // scoring & streaks
     let newScore = dailyScore;
     let newStreak = dailyStreak;
     if (zone === "green") {
@@ -457,9 +447,7 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     } else if (zone === "yellow") {
       newScore += 0.5;
       newStreak += 1;
-    } else {
-      newStreak = 0;
-    }
+    } else newStreak = 0;
 
     setDailyScore(newScore);
     setDailyStreak(newStreak);
@@ -469,16 +457,8 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
     const emoji = zone === "green" ? "🟩" : zone === "yellow" ? "🟨" : "🟥";
     const newGrid = [...grid, emoji];
     setGrid(newGrid);
-
-    // Persist progress & lock for the day (after finishing 5)
     localStorage.setItem("predictle_daily_last", TODAY);
     localStorage.setItem("predictle_daily_grid", JSON.stringify(newGrid));
-
-    // Milestones confetti
-    if ([5, 10, 25, 50, 100].includes(newStreak)) {
-      spawnConfetti(200);
-      showToast(`🔥 ${newStreak} daily streak!`);
-    }
   };
 
   const nextQ = () => {
@@ -499,29 +479,23 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
   const share = () => {
     const text = `📊 Predictle — ${TODAY}\n${grid.join("")}\nScore: ${dailyScore.toFixed(
       1
-    )} | Streak: ${dailyStreak}\nPlay: https://predictist.io/predictle\n#Predictle #PredictionMarkets`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
+    )} | Streak: ${dailyStreak}\nPlay: https://predictist.io/predictle`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank");
   };
 
-  const resetDaily = () => {
-    localStorage.removeItem("predictle_daily_last");
-    localStorage.removeItem("predictle_daily_grid");
-    localStorage.removeItem("predictle_daily_step");
-    localStorage.setItem("predictle_daily_score", "0");
-    localStorage.setItem("predictle_daily_streak", "0");
-    setGrid([]);
-    setStep(0);
-    setLocked(false);
-    setFeedback(null);
-    setGuess(50);
-    setDailyScore(0);
-    setDailyStreak(0);
-  };
-
-  if (loading) return <Card dark={dark}><p className="text-gray-500">Loading today’s markets…</p></Card>;
-  if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!todaysFive.length) {
+  if (loading)
+    return (
+      <Card dark={dark}>
+        <p className="text-gray-500">Loading today’s markets…</p>
+      </Card>
+    );
+  if (fetchError)
+    return (
+      <Card dark={dark}>
+        <p className="text-red-500">{fetchError}</p>
+      </Card>
+    );
+  if (!todaysFive.length)
     return (
       <Card dark={dark}>
         <p className="text-gray-500">Preparing today’s challenge…</p>
@@ -530,26 +504,21 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
         </div>
       </Card>
     );
-  }
 
-  if (locked && step === 5) {
+  if (locked && step === 5)
     return (
       <Card dark={dark}>
         <h2 className="text-xl font-semibold mb-2">Daily Results</h2>
-        <div className="text-3xl mb-2">{grid.join("") || "🟩🟨🟥🟩🟩"}</div>
+        <div className="text-3xl mb-2">{grid.join("")}</div>
         <div className="flex gap-6 mb-4 justify-center">
           <Stat label="Daily Score" value={dailyScore.toFixed(1)} color="blue" />
           <Stat label="Daily Streak" value={dailyStreak} color="green" />
         </div>
-        <div className="flex gap-3 justify-center">
-          <Button onClick={share}>Share Results</Button>
-          <Button variant="ghost" onClick={resetDaily}>Reset (debug)</Button>
-        </div>
+        <Button onClick={share}>Share Results</Button>
       </Card>
     );
-  }
 
-  const [left, right] = current?.outcomes || [{}, {}]; // left = perspective for slider %
+  const [left, right] = current?.outcomes || [{}, {}];
   return (
     <Card dark={dark}>
       <div className="flex items-center justify-between mb-3">
@@ -560,19 +529,13 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
         </div>
       </div>
 
-      {current ? (
-  <p className="text-gray-500 mb-4">{current.question}</p>
-) : (
-  <p className="text-gray-500 mb-4 italic">Loading question…</p>
-)}
+      <p className="text-gray-500 mb-4">{current?.question || "Loading…"}</p>
 
-      {/* Labels */}
       <div className="flex justify-between text-sm text-gray-400 mb-2">
         <span>{left?.name || "Outcome A"}</span>
         <span>{right?.name || "Outcome B"}</span>
       </div>
 
-      {/* Slider */}
       <input
         type="range"
         min="0"
@@ -583,12 +546,15 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
       />
       <p className="text-center mt-2 font-medium">Your guess: {guess}%</p>
 
-      {/* Feedback */}
       {feedback ? (
         <>
           <ComparisonBar guess={feedback.guess} actual={feedback.actual} />
           <p className="mt-4 text-lg font-semibold text-center">
-            {feedback.zone === "green" ? "✅ Perfect!" : feedback.zone === "yellow" ? "🟨 Close!" : "❌ Off!"}{" "}
+            {feedback.zone === "green"
+              ? "✅ Perfect!"
+              : feedback.zone === "yellow"
+              ? "🟨 Close!"
+              : "❌ Off!"}{" "}
             You guessed {feedback.guess}%, actual {feedback.actual}%.
           </p>
           <div className="flex justify-center mt-4">
@@ -605,23 +571,26 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
 }
 
 /* -------------------------------------------------------
-   Free Play – infinite; separate scoreboard (localStorage)
-   Tiered scoring identical to Daily.
+   Free Play (patched shuffle order)
 ------------------------------------------------------- */
 function FreePlay({ dark, markets, loading, fetchError }) {
+  const [order, setOrder] = useState([]);
   const [idx, setIdx] = useState(0);
   const [guess, setGuess] = useState(50);
   const [feedback, setFeedback] = useState(null);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
 
-  // restore scoreboard
   useEffect(() => {
     const s = parseFloat(localStorage.getItem("predictle_fp_score") || "0");
     const k = parseInt(localStorage.getItem("predictle_fp_streak") || "0", 10);
     setScore(s);
     setStreak(k);
   }, []);
+
+  useEffect(() => {
+    if (markets.length) setOrder(shuffle([...Array(markets.length).keys()]));
+  }, [markets]);
 
   const judge = (guessPct, actualPct) => {
     const diff = Math.abs(guessPct - actualPct);
@@ -630,13 +599,11 @@ function FreePlay({ dark, markets, loading, fetchError }) {
     return "red";
   };
 
-  const current = markets[idx];
+  const current = markets[order[idx]];
 
   const handleSubmit = () => {
     if (!current || feedback) return;
-    const prices = current.outcomes.map((o) => o.price);
-    const actual = Math.round(prices[0] * 100);
-
+    const actual = Math.round(current.outcomes[0].price * 100);
     const zone = judge(guess, actual);
     setFeedback({ zone, guess, actual });
 
@@ -668,14 +635,24 @@ function FreePlay({ dark, markets, loading, fetchError }) {
   const next = () => {
     setFeedback(null);
     setGuess(50);
-    if (!markets.length) return;
-    const nextIdx = Math.floor(Math.random() * markets.length);
+    if (!order.length) return;
+    const nextIdx = (idx + 1) % order.length;
     setIdx(nextIdx);
   };
 
-  if (loading) return <Card dark={dark}><p className="text-gray-500">Loading markets…</p></Card>;
-  if (fetchError) return <Card dark={dark}><p className="text-red-500">{fetchError}</p></Card>;
-  if (!markets.length) {
+  if (loading)
+    return (
+      <Card dark={dark}>
+        <p className="text-gray-500">Loading markets…</p>
+      </Card>
+    );
+  if (fetchError)
+    return (
+      <Card dark={dark}>
+        <p className="text-red-500">{fetchError}</p>
+      </Card>
+    );
+  if (!markets.length)
     return (
       <Card dark={dark}>
         <p className="text-gray-500">No markets available.</p>
@@ -684,7 +661,6 @@ function FreePlay({ dark, markets, loading, fetchError }) {
         </div>
       </Card>
     );
-  }
 
   const [left, right] = current.outcomes;
   return (
@@ -718,7 +694,11 @@ function FreePlay({ dark, markets, loading, fetchError }) {
         <>
           <ComparisonBar guess={feedback.guess} actual={feedback.actual} />
           <p className="mt-4 text-lg font-semibold text-center">
-            {feedback.zone === "green" ? "✅ Perfect!" : feedback.zone === "yellow" ? "🟨 Close!" : "❌ Off!"}{" "}
+            {feedback.zone === "green"
+              ? "✅ Perfect!"
+              : feedback.zone === "yellow"
+              ? "🟨 Close!"
+              : "❌ Off!"}{" "}
             You guessed {feedback.guess}%, actual {feedback.actual}%.
           </p>
           <div className="flex justify-center mt-4">
@@ -735,22 +715,20 @@ function FreePlay({ dark, markets, loading, fetchError }) {
 }
 
 /* -------------------------------------------------------
-   Visual comparison bar: shows guess vs actual
+   Comparison bar + UI primitives
 ------------------------------------------------------- */
 function ComparisonBar({ guess, actual }) {
-  // clamp just in case
   const g = Math.max(0, Math.min(100, guess));
   const a = Math.max(0, Math.min(100, actual));
   const diff = Math.abs(g - a);
 
-  let color = "#ef4444"; // red
-  if (diff <= 10) color = "#22c55e"; // green
-  else if (diff <= 20) color = "#eab308"; // yellow
+  let color = "#ef4444";
+  if (diff <= 10) color = "#22c55e";
+  else if (diff <= 20) color = "#eab308";
 
   return (
     <div className="mt-5">
       <div className="relative h-3 rounded-full bg-gray-300 dark:bg-gray-700 overflow-hidden">
-        {/* fill toward actual from both sides to emphasize target zone */}
         <div
           className="absolute top-0 bottom-0"
           style={{
@@ -761,17 +739,13 @@ function ComparisonBar({ guess, actual }) {
             transition: "width .3s ease",
           }}
         />
-        {/* Guess marker */}
         <div
           className="absolute -top-1 h-5 w-1.5 bg-blue-600 rounded"
           style={{ left: `calc(${g}% - 2px)` }}
-          title={`Your guess: ${g}%`}
         />
-        {/* Actual marker */}
         <div
           className="absolute -top-1 h-5 w-1.5 bg-black dark:bg-white rounded"
           style={{ left: `calc(${a}% - 2px)` }}
-          title={`Actual: ${a}%`}
         />
       </div>
       <div className="flex justify-between text-xs text-gray-400 mt-1">
@@ -783,16 +757,10 @@ function ComparisonBar({ guess, actual }) {
   );
 }
 
-/* -------------------------------------------------------
-   Tiny UI primitives
-------------------------------------------------------- */
 function Card({ dark, children }) {
   return (
     <div
-      className={classNames(
-        "shadow-md rounded-xl p-6",
-        dark ? "bg-gray-800" : "bg-white"
-      )}
+      className={classNames("shadow-md rounded-xl p-6", dark ? "bg-gray-800" : "bg-white")}
     >
       {children}
     </div>
@@ -812,7 +780,11 @@ function Button({ children, onClick, disabled, variant = "solid", color = "blue"
       ? ghost
       : `${colorMap[color] || colorMap.blue} ${solid} px-5 py-3 rounded-lg transition`;
   return (
-    <button onClick={onClick} disabled={disabled} className={classNames("disabled:opacity-60", cls)}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={classNames("disabled:opacity-60", cls)}
+    >
       {children}
     </button>
   );
@@ -827,3 +799,4 @@ function Stat({ label, value, color = "blue" }) {
     </div>
   );
 }
+
