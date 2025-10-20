@@ -560,7 +560,11 @@ function DailyChallenge({ dark, markets, loading, fetchError }) {
         </div>
       </div>
 
-      <p className="text-gray-500 mb-4">{current.question}</p>
+      {current ? (
+  <p className="text-gray-500 mb-4">{current.question}</p>
+) : (
+  <p className="text-gray-500 mb-4 italic">Loading question…</p>
+)}
 
       {/* Labels */}
       <div className="flex justify-between text-sm text-gray-400 mb-2">
