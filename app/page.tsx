@@ -10,6 +10,7 @@ export default async function HomePage(){
     <div className="grid" style={{gap:28}}>
       {/* HERO */}
       <section
+  className="hero-bg"
   style={{
     textAlign: 'center',
     display: 'flex',
@@ -17,7 +18,9 @@ export default async function HomePage(){
     alignItems: 'center',
     justifyContent: 'center',
     gap: '1rem',
-    padding: '80px 0 60px',
+    padding: '120px 0 100px',
+    position: 'relative',
+    zIndex: 1,
   }}
 >
   <span className="kicker">Prediction-Market Media & Data</span>
