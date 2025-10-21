@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import { useEffect, useState } from 'react';
+import SignalWave from '@/components/SignalWave';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -42,20 +43,40 @@ export default function NavBar() {
           padding: '1rem 2rem',
         }}
       >
-        <Link
-          href="/"
-          style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700,
-            fontSize: '1.25rem',
-            background: 'linear-gradient(90deg, var(--accent), #6aa5ff)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Predictist
-        </Link>
+        import SignalWave from '@/components/SignalWave'; // ✅ add this near your imports
+
+/* ...then inside your <nav> ... */
+
+<Link
+  href="/"
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.6rem',
+    textDecoration: 'none',
+  }}
+>
+  {/* animated wave logo */}
+  <SignalWave animated size={34} strokeWidth={3} />
+
+  {/* gradient wordmark */}
+  <span
+    style={{
+      fontFamily: "'Space Grotesk', sans-serif",
+      fontWeight: 700,
+      fontSize: '1.28rem',
+      background: 'linear-gradient(90deg, var(--accent), #6aa5ff)',
+      WebkitBackgroundClip: 'text',
+      backgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      letterSpacing: '-0.02em',
+      lineHeight: 1,
+    }}
+  >
+    Predictist
+  </span>
+</Link>
+
 
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           {links.map((link) => (
