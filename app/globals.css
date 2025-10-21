@@ -107,3 +107,81 @@ button.ghost{
 .p-lg{ font-size: 18px; color: var(--muted); margin: 6px 0 0 }
 .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center }
 .spacer{ height: 24px }
+/* === GLOBAL POLISH === */
+
+/* Typography */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.6;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Headings */
+.h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 1.1;
+  background: linear-gradient(90deg, var(--accent), #6aa5ff);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+}
+
+.kicker {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+
+/* Buttons */
+button {
+  transition: all 0.25s ease;
+}
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(10,132,255,0.25);
+}
+button.ghost:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+/* Cards */
+.card {
+  transition: all 0.25s ease;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+/* Page layout smoothing */
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+  animation: fadeIn 0.6s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Subtle glass blur for nav/footer */
+header, footer {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(14,17,22,0.65);
+  transition: background 0.3s ease;
+}
+:root[data-theme='light'] header,
+:root[data-theme='light'] footer {
+  background: rgba(255,255,255,0.65);
+}

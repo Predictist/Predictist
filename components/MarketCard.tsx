@@ -25,7 +25,18 @@ function ChangePill({delta}:{delta:number}){
 
 export default function MarketCard({ m }: { m: Market }){
   return (
-    <a href={m.href ?? '#'} className="card" style={{display:'block'}}>
+    <a
+  href={m.href ?? '#'}
+  className="card"
+  style={{
+    display: 'block',
+    position: 'relative',
+    overflow: 'hidden',
+    background:
+      'linear-gradient(145deg, var(--card) 0%, var(--bg-soft) 100%)',
+    border: '1px solid var(--card-border)',
+  }}
+>
       <div className="row" style={{justifyContent:'space-between'}}>
         <div style={{maxWidth:'80%'}}>
           <div className="kicker">{m.source ?? 'Market'}</div>
@@ -47,6 +58,20 @@ export default function MarketCard({ m }: { m: Market }){
           24h Vol: ${m.volume24hUsd.toLocaleString()}
         </div>
       )}
+      <div
+  style={{
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: '100%',
+    height: '2px',
+    background:
+      m.change24h >= 0
+        ? 'linear-gradient(90deg, #00ff9f, transparent)'
+        : 'linear-gradient(90deg, #ff5c5c, transparent)',
+    opacity: 0.3,
+  }}
+/>
     </a>
   );
 }

@@ -9,19 +9,39 @@ export default async function HomePage(){
   return (
     <div className="grid" style={{gap:28}}>
       {/* HERO */}
-      <section className="grid" style={{gap:14}}>
-        <span className="badge">Prediction-Market Media & Data</span>
-        <h1 className="h1">What the world believes will happen.</h1>
-        <p className="p-lg" style={{maxWidth:760}}>
-          Predictist combines real-time market data, sharp analysis, and interactive play.
-          Explore live probabilities, read the signal, then test your intuition with Predictle.
-        </p>
-        <div className="row" style={{marginTop:6}}>
-          <Link href="/predictle"><button>Play Predictle</button></Link>
-          <Link href="/dashboard"><button className="ghost">Open Dashboard</button></Link>
-          <Link href="/subscribe"><button className="ghost">Subscribe</button></Link>
-        </div>
-      </section>
+      <section
+  style={{
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '1rem',
+    padding: '80px 0 60px',
+  }}
+>
+  <span className="kicker">Prediction-Market Media & Data</span>
+  <h1 className="h1">What the world believes will happen.</h1>
+  <p className="p-lg" style={{ maxWidth: 720 }}>
+    Predictist fuses prediction markets, analytics, and storytelling into one
+    ecosystem — showing in real time what the crowd expects next.
+  </p>
+  <div className="row" style={{ marginTop: 20 }}>
+    <Link href="/predictle">
+      <button>Play Predictle</button>
+    </Link>
+    <Link href="/dashboard">
+      <button className="ghost">Open Dashboard</button>
+    </Link>
+    <Link href="/subscribe">
+      <button className="ghost">Subscribe</button>
+    </Link>
+  </div>
+  <div style={{ marginTop: 28, color: 'var(--muted)', fontSize: 14 }}>
+    Powered by the wisdom of markets.
+  </div>
+</section>
+
 
       {/* PREVIEW STRIP */}
       <section className="grid" style={{gap:12}}>
