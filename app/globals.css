@@ -258,3 +258,13 @@ header, footer {
     transform: rotate(360deg);
   }
 }
+/* SignalWave animation */
+.wave-anim path {
+  stroke-dasharray: 140 300;
+  animation: waveShift 2.4s ease-in-out infinite;
+}
+@keyframes waveShift {
+  0%   { stroke-dashoffset: 0; }
+  50%  { stroke-dashoffset: -220; }
+  100% { stroke-dashoffset: 0; }
+}
