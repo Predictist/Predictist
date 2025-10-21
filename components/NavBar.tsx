@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
-'use client';
 import { useEffect, useState } from 'react';
 
 const links = [
