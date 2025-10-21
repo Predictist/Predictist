@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import ThemeToggle from './ThemeToggle';
 import { useEffect, useState } from 'react';
-import SignalWave from '@/components/SignalWave';
+import ThemeToggle from './ThemeToggle';
+import SignalWave from '@/components/SignalWave'; // ✅ animated logo component
 
+// Navigation links
 const links = [
   { href: '/', label: 'Home' },
   { href: '/predictle', label: 'Predictle' },
@@ -17,6 +18,7 @@ export default function NavBar() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
+  // Adds scroll effect for translucent header
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', onScroll);
@@ -31,7 +33,9 @@ export default function NavBar() {
         zIndex: 50,
         backdropFilter: 'blur(10px)',
         borderBottom: '1px solid var(--card-border)',
-        background: scrolled ? 'rgba(14,17,22,0.85)' : 'rgba(14,17,22,0.55)',
+        background: scrolled
+          ? 'rgba(14,17,22,0.85)'
+          : 'rgba(14,17,22,0.55)',
         transition: 'background 0.3s ease, border 0.3s ease',
       }}
     >
@@ -43,41 +47,38 @@ export default function NavBar() {
           padding: '1rem 2rem',
         }}
       >
-        import SignalWave from '@/components/SignalWave'; // ✅ add this near your imports
+        {/* Logo + Wordmark */}
+        <Link
+          href="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            textDecoration: 'none',
+          }}
+        >
+          {/* Animated signal wave */}
+          <SignalWave animated size={34} strokeWidth={3} />
 
-/* ...then inside your <nav> ... */
+          {/* Predictist wordmark */}
+          <span
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: '1.28rem',
+              background: 'linear-gradient(90deg, var(--accent), #6aa5ff)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
+              lineHeight: 1,
+            }}
+          >
+            Predictist
+          </span>
+        </Link>
 
-<Link
-  href="/"
-  style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.6rem',
-    textDecoration: 'none',
-  }}
->
-  {/* animated wave logo */}
-  <SignalWave animated size={34} strokeWidth={3} />
-
-  {/* gradient wordmark */}
-  <span
-    style={{
-      fontFamily: "'Space Grotesk', sans-serif",
-      fontWeight: 700,
-      fontSize: '1.28rem',
-      background: 'linear-gradient(90deg, var(--accent), #6aa5ff)',
-      WebkitBackgroundClip: 'text',
-      backgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      letterSpacing: '-0.02em',
-      lineHeight: 1,
-    }}
-  >
-    Predictist
-  </span>
-</Link>
-
-
+        {/* Nav Links + Theme Toggle */}
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           {links.map((link) => (
             <Link
@@ -99,4 +100,3 @@ export default function NavBar() {
     </header>
   );
 }
-
