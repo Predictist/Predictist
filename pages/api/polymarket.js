@@ -72,6 +72,21 @@ export default async function handler(req, res) {
       m.id === e.id ||
       m.id === market.id
   ) || null;
+  if (!clobMatch) {
+  // no match at all
+  continue;
+}
+
+// temporary debugging — will print one matched market
+if (Math.random() < 0.02) {
+  console.log("🔎 CLOB match example:", {
+    slug: clobMatch.slug,
+    id: clobMatch.id,
+    keys: Object.keys(clobMatch),
+    outcomes: clobMatch.outcomes?.slice(0, 2),
+  });
+}
+
 
 
       const o0 = clobMatch?.outcomes?.[0];
