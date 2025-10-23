@@ -30,7 +30,8 @@ export default async function handler(req, res) {
     console.log(`✅ Gamma fetched ${gammaEvents.length}`);
 
     // --- 2️⃣ Fetch CLOB (live prices) from mirror API
-const clobURL = "https://strapi-api.polymarket.watch/api/markets?limit=1000";
+const clobURL =
+  "https://r.jina.ai/https://clob.polymarket.com/markets?limit=1000";
 const clobRes = await fetch(clobURL, {
   headers: { accept: "application/json" },
   cache: "no-store",
