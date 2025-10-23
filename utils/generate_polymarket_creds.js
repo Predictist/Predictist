@@ -1,5 +1,5 @@
 // utils/generate_polymarket_creds.js
-// ✅ Fixed for October 2025 @polymarket/clob-client
+// ✅ Works with current @polymarket/clob-client (Oct 2025)
 
 import dotenv from "dotenv";
 import { JsonRpcProvider, Wallet } from "ethers";
@@ -12,22 +12,17 @@ const { ClobClient } = pkg;
 async function generateCreds() {
   try {
     const PRIVATE_KEY = process.env.POLY_PRIVATE_KEY;
-    if (!PRIVATE_KEY) {
-      throw new Error("Missing POLY_PRIVATE_KEY in .env");
-    }
+    if (!PRIVATE_KEY) throw new Error("Missing POLY_PRIVATE_KEY in .env");
 
     console.log("🔑 Initializing Polymarket client...");
 
     const provider = new JsonRpcProvider("https://polygon-rpc.com");
     const signer = new Wallet(PRIVATE_KEY, provider);
 
-    // ✅ Updated constructor syntax — host wrapped inside `options`
-    const client = new ClobClient({
+    // ✅ Correct syntax for Oct 2025
+    const client = new ClobClient("https://clob.polymarket.com", {
       signer,
       chainId: 137,
-      options: {
-        host: "https://clob.polymarket.com",
-      },
     });
 
     console.log("🪄 Generating new API credentials...");
@@ -50,4 +45,5 @@ async function generateCreds() {
 }
 
 generateCreds();
+
 
