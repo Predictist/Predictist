@@ -5,14 +5,13 @@ import { Wallet, JsonRpcProvider } from "ethers";
 
 const provider = new JsonRpcProvider("https://polygon-rpc.com");
 const signer = new Wallet(process.env.PRIVATE_KEY, provider);
-
 const HOST = "https://clob.polymarket.com";
 
 async function fetchMarkets() {
   const client = new ClobClient(HOST, signer);
 
   const params = {
-    limit: 1000,
+    limit: 10, // temporarily small to avoid overloading
     closed: "false",
     active: "true",
     archived: "false",
@@ -22,19 +21,16 @@ async function fetchMarkets() {
   const result = await client.getMarkets(params);
   const markets = result?.data || result?.markets || [];
 
-  console.log(`✅ Pulled ${markets.length} markets`);
+  console.log(`✅ Pulled ${markets.length} markets\n`);
 
-  markets.slice(0, 5).forEach((m, i) => {
-    const yesOutcome =
-      m.outcomes?.find((o) => /yes/i.test(o.name)) || m.outcomes?.[0];
-    const yes = yesOutcome?.price
-      ? (yesOutcome.price * 100).toFixed(0)
-      : "N/A";
-    console.log(`• [${i + 1}] ${m.question || m.title || "Untitled"} (${yes}%)`);
-  });
+  for (let i = 0; i < Math.min(markets.length, 5); i++) {
+    const m = markets[i];
+    const state = await client.getMarketState(m.id).catch(() => null);
 
-  if (markets.length === 0) {
-    console.log("⚠️ Raw response keys:", Object.keys(result || {}));
+    const yesPrice = state?.mid ?? state?.bestBid ?? state?.yes_price ?? null;
+    const pct = yesPrice ? (yesPrice * 100).toFixed(0) : "N/A";
+
+    console.log(`• [${i + 1}] ${m.question || m.title || "Untitled"} (${pct}%)`);
   }
 }
 
