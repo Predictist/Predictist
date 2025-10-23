@@ -72,8 +72,15 @@ export default async function handler(req, res) {
         ) || null;
 
             // --- Extract price data robustly
-      const o0 = clobMatch?.outcomes?.[0] || clobMatch?.tokens?.[0];
-      const o1 = clobMatch?.outcomes?.[1] || clobMatch?.tokens?.[1];
+            // --- Extract price data robustly (handles both outcomes[] and tokens[])
+      const o0 =
+        clobMatch?.outcomes?.[0] ||
+        clobMatch?.tokens?.[0] ||
+        null;
+      const o1 =
+        clobMatch?.outcomes?.[1] ||
+        clobMatch?.tokens?.[1] ||
+        null;
 
       function extractPrice(o, fallback) {
         if (!o) return fallback;
@@ -89,12 +96,22 @@ export default async function handler(req, res) {
         return fallback;
       }
 
+      // tokens[] use direct prices (0–1)
       let yes = extractPrice(o0, 0.5);
       let no = extractPrice(o1, 1 - yes);
 
-      // Handle edge cases where one side missing
-      if (yes === 0.5 && typeof no === "number" && no !== 0.5) yes = 1 - no;
-      if (no === 0.5 && typeof yes === "number" && yes !== 0.5) no = 1 - yes;
+      // Handle inverted or identical prices
+      if (yes === no) {
+        if (yes === 1) {
+          yes = 1;
+          no = 0;
+        } else if (yes === 0) {
+          yes = 0;
+          no = 1;
+        } else {
+          no = 1 - yes;
+        }
+      }
 
       // Clamp to [0,1]
       yes = Math.max(0, Math.min(1, yes));
