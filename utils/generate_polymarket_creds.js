@@ -1,8 +1,8 @@
 // utils/generate_polymarket_creds.js
-// ✅ Generate Polymarket L2 API credentials (Node.js version)
+// ✅ Works with Ethers v6 and @polymarket/clob-client
 
 import dotenv from "dotenv";
-import { Wallet, providers } from "ethers";
+import { JsonRpcProvider, Wallet } from "ethers";
 import pkg from "@polymarket/clob-client";
 
 dotenv.config();
@@ -18,11 +18,10 @@ async function generateCreds() {
 
     console.log("🔑 Initializing Polymarket client...");
 
-    // Connect to Polygon mainnet
-    const provider = new providers.JsonRpcProvider("https://polygon-rpc.com");
+    // ✅ Correct Ethers v6 provider
+    const provider = new JsonRpcProvider("https://polygon-rpc.com");
     const signer = new Wallet(PRIVATE_KEY, provider);
 
-    // Initialize the CLOB client (this signs messages under the hood)
     const client = new ClobClient({
       signer,
       chainId: 137,
@@ -49,3 +48,4 @@ async function generateCreds() {
 }
 
 generateCreds();
+
