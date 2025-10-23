@@ -62,13 +62,17 @@ export default async function handler(req, res) {
 
       // Match CLOB by slug/id
       const clobMatch =
-        clobMarkets.find(
-          (m) =>
-            m.slug === e.slug ||
-            m.slug === market.slug ||
-            m.id === e.id ||
-            m.id === market.id
-        ) || null;
+  clobMarkets.find(
+    (m) =>
+      m.conditionId === e.condition_id ||
+      m.conditionId === market.condition_id ||
+      m.condition_id === e.condition_id ||
+      m.slug === e.slug ||
+      m.slug === market.slug ||
+      m.id === e.id ||
+      m.id === market.id
+  ) || null;
+
 
       const o0 = clobMatch?.outcomes?.[0];
       const o1 = clobMatch?.outcomes?.[1];
