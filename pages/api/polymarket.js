@@ -31,36 +31,41 @@ export default async function handler(req, res) {
     console.log(`✅ Pulled ${markets.length} markets`);
 
     // --- 2️⃣ Normalize and filter
-    const playable = [];
+const playable = [];
 
-    for (const m of markets) {
-      // Skip bad data
-      if (!m?.question || !m?.tokens || m.tokens.length < 2) continue;
+for (const m of markets) {
+  if (!m?.question || !m?.tokens || m.tokens.length < 2) continue;
 
-      const outcomes = m.tokens.map((t) => t.outcome);
-      const yes = typeof m.tokens[0].price === "number" ? m.tokens[0].price : 0.5;
-      const no = typeof m.tokens[1].price === "number" ? m.tokens[1].price : 1 - yes;
+  const outcomes = m.tokens.map((t) => t.outcome);
+  const yes = typeof m.tokens[0].price === "number" ? m.tokens[0].price : 0.5;
+  const no = typeof m.tokens[1].price === "number" ? m.tokens[1].price : 1 - yes;
 
-      // Skip closed/test/archived markets
-      const q = m.question.trim();
-      const lowerQ = q.toLowerCase();
-      if (
-        lowerQ.includes("test") ||
-        lowerQ.includes("archive") ||
-        /\b(2018|2019|2020|2021|2022|2023)\b/.test(lowerQ)
-      )
-        continue;
+  const q = m.question.trim();
+  const lowerQ = q.toLowerCase();
 
-      // Add to playable set
-      playable.push({
-        id: m.condition_id || m.id,
-        question: q,
-        outcomes: [
-          { name: outcomes[0] || "Yes", price: yes },
-          { name: outcomes[1] || "No", price: no },
-        ],
-      });
-    }
+  // ⛔ Skip test/archive/old markets
+  if (
+    lowerQ.includes("test") ||
+    lowerQ.includes("archive") ||
+    /\b(2018|2019|2020|2021|2022|2023|2024)\b/.test(lowerQ)
+  ) continue;
+
+  // 🕒 Skip markets that have already ended
+  const endTime = m.end_date_iso ? new Date(m.end_date_iso).getTime() : null;
+  const now = Date.now();
+  if (endTime && endTime < now) continue;
+
+  // ✅ Add only future/active markets
+  playable.push({
+    id: m.condition_id || m.id,
+    question: q,
+    outcomes: [
+      { name: outcomes[0] || "Yes", price: yes },
+      { name: outcomes[1] || "No", price: no },
+    ],
+  });
+}
+
 
     // --- 3️⃣ Clean and shuffle
     const clean = playable
