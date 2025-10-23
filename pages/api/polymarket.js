@@ -29,33 +29,20 @@ export default async function handler(req, res) {
     const gammaEvents = Array.isArray(gammaBody) ? gammaBody : [];
     console.log(`✅ Gamma fetched ${gammaEvents.length}`);
 
-    // --- 2️⃣ Fetch live prices via GraphQL (CLOB replacement)
-    // --- 2️⃣ Fetch live prices via GraphQL (V2)
-const gqlQuery = `
-  {
-    marketsV2(limit: 1000, closed: false) {
-      id
-      slug
-      question
-      conditionId
-      latestPrice
-      prices {
-        yes
-        no
-      }
-    }
-  }
-`;
-
-const clobRes = await fetch("https://gamma-api.polymarket.com/query", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ query: gqlQuery }),
+    // --- 2️⃣ Fetch CLOB (live prices) from mirror API
+const clobURL = "https://strapi-api.polymarket.watch/api/markets?limit=1000";
+const clobRes = await fetch(clobURL, {
+  headers: { accept: "application/json" },
+  cache: "no-store",
 });
 
-const clobData = await clobRes.json().catch(() => ({}));
-const clobMarkets = clobData?.data?.marketsV2 || [];
-console.log(`✅ CLOB (GraphQL V2) fetched ${clobMarkets.length}`);
+const clobBody = await clobRes.json().catch(() => []);
+const clobMarkets = Array.isArray(clobBody)
+  ? clobBody
+  : Array.isArray(clobBody?.data)
+  ? clobBody.data
+  : [];
+console.log(`✅ CLOB fetched ${clobMarkets.length}`);
 
     // --- 3️⃣ Merge & normalize
     const playable = [];
