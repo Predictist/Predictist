@@ -73,25 +73,45 @@ export default async function handler(req, res) {
       const o0 = clobMatch?.outcomes?.[0];
       const o1 = clobMatch?.outcomes?.[1];
 
-      // Get prices with fallbacks
-      let yes =
-        typeof o0?.price === "number"
-          ? o0.price
-          : typeof o0?.last_price === "number"
-          ? o0.last_price
-          : typeof o0?.price?.mid === "number"
-          ? o0.price.mid
-          : 0.5;
-      let no =
-        typeof o1?.price === "number"
-          ? o1.price
-          : typeof o1?.last_price === "number"
-          ? o1.last_price
-          : 1 - yes;
+      // ---  💰 Extract prices more intelligently
+const extractPrice = (outcome) => {
+  if (!outcome) return null;
 
-      // Clamp to [0,1]
-      yes = Math.max(0, Math.min(1, yes));
-      no = Math.max(0, Math.min(1, no));
+  // Common Polymarket fields
+  if (typeof outcome.price === "number") return outcome.price;
+  if (typeof outcome.last_price === "number") return outcome.last_price;
+  if (typeof outcome.midPrice === "number") return outcome.midPrice;
+  if (typeof outcome?.price?.mid === "number") return outcome.price.mid;
+
+  // Sometimes price data is nested in bids/asks
+  if (typeof outcome.bestBid === "number" && typeof outcome.bestAsk === "number")
+    return (outcome.bestBid + outcome.bestAsk) / 2;
+
+  // Fallback if string
+  if (typeof outcome.price === "string") {
+    const val = parseFloat(outcome.price);
+    if (!isNaN(val)) return val;
+  }
+
+  return null;
+};
+
+let yes = extractPrice(o0);
+let no = extractPrice(o1);
+
+// If only one side has price, infer the other
+if (yes == null && no != null) yes = 1 - no;
+if (no == null && yes != null) no = 1 - yes;
+
+// Final fallback
+if (yes == null || no == null) {
+  yes = 0.5;
+  no = 0.5;
+}
+
+// Clamp to [0, 1]
+yes = Math.max(0, Math.min(1, yes));
+no = Math.max(0, Math.min(1, no));
 
       // Skip invalid or nonsensical markets
       const q =
