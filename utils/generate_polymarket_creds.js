@@ -1,5 +1,5 @@
 // utils/generate_polymarket_creds.js
-// ✅ Works with Ethers v6 and @polymarket/clob-client
+// ✅ Fixed for October 2025 @polymarket/clob-client
 
 import dotenv from "dotenv";
 import { JsonRpcProvider, Wallet } from "ethers";
@@ -18,14 +18,16 @@ async function generateCreds() {
 
     console.log("🔑 Initializing Polymarket client...");
 
-    // ✅ Correct Ethers v6 provider
     const provider = new JsonRpcProvider("https://polygon-rpc.com");
     const signer = new Wallet(PRIVATE_KEY, provider);
 
+    // ✅ Updated constructor syntax — host wrapped inside `options`
     const client = new ClobClient({
       signer,
       chainId: 137,
-      host: "https://clob.polymarket.com",
+      options: {
+        host: "https://clob.polymarket.com",
+      },
     });
 
     console.log("🪄 Generating new API credentials...");
