@@ -23,7 +23,7 @@ async function fetchMarkets() {
   const result = await client.getMarkets(params);
 
   // The SDK returns { markets, meta }
-  const markets = result?.markets || [];
+  const markets = result?.data || result?.markets || [];
   console.log(`✅ Pulled ${markets.length} markets`);
 
   // Print first few examples
