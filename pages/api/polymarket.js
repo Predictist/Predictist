@@ -68,20 +68,31 @@ async function tryGammaAPI() {
     const offset = page * limitPerPage;
     const url = `https://gamma-api.polymarket.com/events?closed=false&limit=${limitPerPage}&ascending=false&offset=${offset}`;
 
+    // pages/api/polymarket.js
     try {
+      console.log("🌐 Fetching fresh Polymarket data...");
+      const url = "https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=1500";
       const r = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
-      if (!r.ok) break;
-      console.log("🔍 Example raw event:", JSON.stringify(data[0], null, 2));
+
+      if (!r.ok) throw new Error(`Gamma API returned ${r.status}`);
+
       const body = await r.json();
-      const events = Array.isArray(body)
-        ? body
-        : body?.data || body?.events || [];
-      if (!events.length) break;
-      allEvents.push(...events);
-    } catch (e) {
-      console.error("Gamma API error:", e);
-      break;
+      if (!Array.isArray(body)) throw new Error("Gamma response not array");
+
+      // Log one sample safely
+      if (body.length > 0) console.log("🔍 Example raw event:", JSON.stringify(body[0], null, 2));
+
+      const events = body;
+      const normalized = normalizeMarkets(events);
+
+      if (!normalized.length) throw new Error("Gamma returned 0 playable");
+
+      console.log(`✅ Gamma fetched ${events.length} • playable ${normalized.length}`);
+      return res.status(200).json(normalized);
+    } catch (err) {
+      console.warn("⚠️ Gamma API failed, falling back to CLOB...", err.message);
     }
+
   }
   return allEvents;
 }
