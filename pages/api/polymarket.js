@@ -70,28 +70,35 @@ export default async function handler(req, res) {
             m.id === market.id
         ) || null;
 
-      const o0 = clobMatch?.outcomes?.[0];
-      const o1 = clobMatch?.outcomes?.[1];
+            // --- Extract price data robustly
+      const o0 = clobMatch?.outcomes?.[0] || clobMatch?.tokens?.[0];
+      const o1 = clobMatch?.outcomes?.[1] || clobMatch?.tokens?.[1];
 
-      // Get prices with fallbacks
-      let yes =
-        typeof o0?.price === "number"
-          ? o0.price
-          : typeof o0?.last_price === "number"
-          ? o0.last_price
-          : typeof o0?.price?.mid === "number"
-          ? o0.price.mid
-          : 0.5;
-      let no =
-        typeof o1?.price === "number"
-          ? o1.price
-          : typeof o1?.last_price === "number"
-          ? o1.last_price
-          : 1 - yes;
+      function extractPrice(o, fallback) {
+        if (!o) return fallback;
+        if (typeof o.price === "number") return o.price;
+        if (typeof o.last_price === "number") return o.last_price;
+        if (typeof o?.price?.mid === "number") return o.price.mid;
+        if (typeof o?.price?.yes === "number") return o.price.yes;
+        if (typeof o?.price?.no === "number") return 1 - o.price.no;
+        if (typeof o?.best_bid === "number" && typeof o?.best_ask === "number")
+          return (o.best_bid + o.best_ask) / 2;
+        if (typeof o?.best_bid === "number") return o.best_bid;
+        if (typeof o?.best_ask === "number") return 1 - o.best_ask;
+        return fallback;
+      }
+
+      let yes = extractPrice(o0, 0.5);
+      let no = extractPrice(o1, 1 - yes);
+
+      // Handle edge cases where one side missing
+      if (yes === 0.5 && typeof no === "number" && no !== 0.5) yes = 1 - no;
+      if (no === 0.5 && typeof yes === "number" && yes !== 0.5) no = 1 - yes;
 
       // Clamp to [0,1]
       yes = Math.max(0, Math.min(1, yes));
       no = Math.max(0, Math.min(1, no));
+
 
       // Skip invalid or nonsensical markets
       const q =
