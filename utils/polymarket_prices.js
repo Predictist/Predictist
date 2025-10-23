@@ -20,12 +20,21 @@ async function fetchMarkets() {
   const ids = markets.map((m) => m.id).filter(Boolean).slice(0, 50); // first 50 for speed
 
   // Fetch market states directly
-  const stateURL = `${HOST}/market-states?market_ids=${ids.join(",")}`;
+    // ✅ Newer API path — note singular and condition_ids param
+  const stateURL = `${HOST}/market_state?condition_ids=${ids.join(",")}`;
   const res = await fetch(stateURL, {
     headers: {
       accept: "application/json",
     },
   });
+
+  // Handle non-JSON errors safely
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("❌ HTTP error:", res.status, res.statusText, "\nResponse:", text.slice(0,200));
+    return;
+  }
+
   const states = await res.json();
 
   // Map id → mid price
