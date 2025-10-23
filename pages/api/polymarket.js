@@ -31,11 +31,17 @@ export default async function handler(req, res) {
     const clobMarkets = clobBody?.data || clobBody || [];
     console.log(`✅ CLOB fetched ${clobMarkets.length}`);
 
-    // --- 3️⃣ Collect all token IDs for fallback price check
-    const tokenIds = clobMarkets
-      .flatMap((m) => (m.tokens || []).map((t) => t.token_id))
-      .filter(Boolean)
-      .slice(0, 1000); // avoid huge payloads
+    // --- 3️⃣ Collect token IDs for fallback price check (only unresolved)
+const tokenIds = clobMarkets
+  .filter((m) => m.active && !m.closed && !m.archived)
+  .flatMap((m) =>
+    (m.tokens || [])
+      .filter((t) => typeof t.price !== "number" || t.price === 0)
+      .map((t) => t.token_id)
+  )
+  .filter(Boolean)
+  .slice(0, 500); // smaller batch = safer
+
 
     // --- 4️⃣ Fetch live prices (POST /prices)
     const pricesURL = "https://clob.polymarket.com/prices";
