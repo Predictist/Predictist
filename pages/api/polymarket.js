@@ -30,28 +30,32 @@ export default async function handler(req, res) {
     console.log(`✅ Gamma fetched ${gammaEvents.length}`);
 
     // --- 2️⃣ Fetch live prices via GraphQL (CLOB replacement)
-    const gqlQuery = `
-      {
-        markets(limit: 1000, closed: false) {
-          id
-          slug
-          question
-          conditionId
-          yesPrice
-          noPrice
-        }
+    // --- 2️⃣ Fetch live prices via GraphQL (V2)
+const gqlQuery = `
+  {
+    marketsV2(limit: 1000, closed: false) {
+      id
+      slug
+      question
+      conditionId
+      latestPrice
+      prices {
+        yes
+        no
       }
-    `;
+    }
+  }
+`;
 
-    const clobRes = await fetch("https://gamma-api.polymarket.com/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: gqlQuery }),
-    });
+const clobRes = await fetch("https://gamma-api.polymarket.com/query", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ query: gqlQuery }),
+});
 
-    const clobData = await clobRes.json().catch(() => ({}));
-    const clobMarkets = clobData?.data?.markets || [];
-    console.log(`✅ CLOB (GraphQL) fetched ${clobMarkets.length}`);
+const clobData = await clobRes.json().catch(() => ({}));
+const clobMarkets = clobData?.data?.marketsV2 || [];
+console.log(`✅ CLOB (GraphQL V2) fetched ${clobMarkets.length}`);
 
     // --- 3️⃣ Merge & normalize
     const playable = [];
@@ -80,13 +84,16 @@ export default async function handler(req, res) {
 
       // Pull real prices if available
       let yes =
-        typeof clobMatch?.yesPrice === "number"
-          ? clobMatch.yesPrice
-          : 0.5;
-      let no =
-        typeof clobMatch?.noPrice === "number"
-          ? clobMatch.noPrice
-          : 1 - yes;
+  typeof clobMatch?.prices?.yes === "number"
+    ? clobMatch.prices.yes
+    : typeof clobMatch?.latestPrice === "number"
+    ? clobMatch.latestPrice
+    : 0.5;
+
+let no =
+  typeof clobMatch?.prices?.no === "number"
+    ? clobMatch.prices.no
+    : 1 - yes;
 
       // Clamp to [0,1]
       yes = Math.max(0, Math.min(1, yes));
@@ -139,8 +146,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
-
-
-
-
-
