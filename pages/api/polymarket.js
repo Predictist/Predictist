@@ -1,11 +1,23 @@
 // pages/api/polymarket.js
 /**
  * Predictist Polymarket Aggregator API
- * Combines Gamma + CLOB + Tickers endpoints to produce playable markets.
- * Fully updated for 2025 schemas.
+ * Combines Gamma + CLOB + Ticker endpoints with 5-minute caching.
  */
 
+let cache = {
+  data: null,
+  timestamp: 0,
+};
+
 export default async function handler(req, res) {
+  const now = Date.now();
+
+  // --- 5-Minute In-Memory Cache
+  if (cache.data && now - cache.timestamp < 5 * 60 * 1000) {
+    console.log("⚡ Using cached Polymarket data");
+    return res.status(200).json(cache.data);
+  }
+
   try {
     console.log("🌐 Fetching fresh Polymarket data...");
 
@@ -55,33 +67,55 @@ export default async function handler(req, res) {
     }
 
     /* -----------------------------------------------------
-       3. Tickers API (for live prices)
+       3. Tickers API (Live prices with pagination)
     ----------------------------------------------------- */
-    const tickerURL = "https://clob.polymarket.com/tickers";
-    let priceMap = new Map();
-    try {
-      const tickerRes = await fetch(tickerURL, {
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      });
-      const tickerData = await tickerRes.json().catch(() => []);
-      console.log(`📈 Tickers fetched ${Array.isArray(tickerData) ? tickerData.length : 0}`);
-
-      if (Array.isArray(tickerData)) {
-        for (const t of tickerData) {
-          const key =
-            (t.market || t.slug || t.condition_id || t.token_yes || t.token_no || "").toLowerCase();
-          if (key && typeof t.last_price === "number") {
-            priceMap.set(key, {
-              yes: t.last_price,
-              bid: t.best_bid,
-              ask: t.best_ask,
-            });
+    async function fetchAllTickers() {
+      let results = [];
+      let cursor = null;
+      try {
+        for (let i = 0; i < 5; i++) {
+          const url = cursor
+            ? `https://clob.polymarket.com/tickers?limit=500&cursor=${cursor}`
+            : "https://clob.polymarket.com/tickers?limit=500";
+          const r = await fetch(url, {
+            headers: { accept: "application/json", referer: "https://polymarket.com" },
+            cache: "no-store",
+          });
+          if (!r.ok) break;
+          const body = await r.json();
+          if (Array.isArray(body?.data)) {
+            results.push(...body.data);
+            cursor = body.next_cursor;
+            if (!cursor) break;
+          } else if (Array.isArray(body)) {
+            results.push(...body);
+            break;
+          } else {
+            break;
           }
         }
+      } catch (err) {
+        console.warn("⚠️ Ticker fetch error:", err.message);
       }
-    } catch (err) {
-      console.warn("⚠️ Tickers fetch failed:", err.message);
+      return results;
+    }
+
+    const tickerData = await fetchAllTickers();
+    console.log(`📈 Tickers fetched ${tickerData.length}`);
+
+    const priceMap = new Map();
+    if (Array.isArray(tickerData) && tickerData.length) {
+      for (const t of tickerData) {
+        const key =
+          (t.market || t.slug || t.condition_id || t.token_yes || t.token_no || "").toLowerCase();
+        if (key && typeof t.last_price === "number") {
+          priceMap.set(key, {
+            yes: t.last_price,
+            bid: t.best_bid,
+            ask: t.best_ask,
+          });
+        }
+      }
     }
 
     /* -----------------------------------------------------
@@ -89,7 +123,7 @@ export default async function handler(req, res) {
     ----------------------------------------------------- */
     const merged = [...gammaEvents, ...clobMarkets];
 
-    function extractOutcomes(market) {
+    const extractOutcomes = (market) => {
       const outcomes =
         Array.isArray(market.outcomes) && market.outcomes.length
           ? market.outcomes
@@ -101,7 +135,7 @@ export default async function handler(req, res) {
           : [];
 
       return outcomes.filter((o) => typeof o.price === "number");
-    }
+    };
 
     const normalizeMarket = (raw) => {
       const marketObj =
@@ -124,33 +158,28 @@ export default async function handler(req, res) {
         raw.id ||
         q;
 
-      // Determine prices
-      const o0 = outcomes[0];
-      const o1 = outcomes[1];
-
       let yes =
-        typeof o0?.price === "number"
-          ? o0.price
-          : typeof o0?.last_price === "number"
-          ? o0.last_price
+        typeof outcomes?.[0]?.price === "number"
+          ? outcomes[0].price
+          : typeof outcomes?.[0]?.last_price === "number"
+          ? outcomes[0].last_price
           : 0.5;
+
       let no =
-        typeof o1?.price === "number"
-          ? o1.price
-          : typeof o1?.last_price === "number"
-          ? o1.last_price
+        typeof outcomes?.[1]?.price === "number"
+          ? outcomes[1].price
+          : typeof outcomes?.[1]?.last_price === "number"
+          ? outcomes[1].last_price
           : 1 - yes;
 
-      // Overlay live ticker data if present
-      const tickerKey = (marketObj.market_slug || marketObj.slug || marketObj.condition_id || "")
-        .toLowerCase();
+      // Try overriding with ticker data
+      const tickerKey = (marketObj.market_slug || marketObj.slug || marketObj.condition_id || "").toLowerCase();
       const ticker = priceMap.get(tickerKey);
       if (ticker && typeof ticker.yes === "number" && ticker.yes > 0 && ticker.yes < 1) {
         yes = ticker.yes;
         no = 1 - yes;
       }
 
-      // Clamp + cleanup
       yes = Math.max(0, Math.min(1, yes));
       no = Math.max(0, Math.min(1, no));
 
@@ -172,7 +201,6 @@ export default async function handler(req, res) {
       .filter((m) => {
         if (!m.question || m.question.length < 8) return false;
         if (m.closed || m.resolved) return false;
-        if (m.outcomes.some((o) => o.price === 0.5)) return true; // allow but lower priority
         const valid = m.outcomes.some((o) => o.price > 0 && o.price < 1);
         return valid;
       });
@@ -189,8 +217,11 @@ export default async function handler(req, res) {
     });
 
     /* -----------------------------------------------------
-       6. Respond
+       6. Cache + Respond
     ----------------------------------------------------- */
+    cache.data = deduped;
+    cache.timestamp = now;
+
     console.log(`🎯 normalizeMarkets → ${deduped.length} playable`);
     deduped.slice(0, 3).forEach((m) => {
       const yes = Math.round(m.outcomes[0].price * 100);
@@ -203,5 +234,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Internal server error", detail: err.message });
   }
 }
+
 
 
