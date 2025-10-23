@@ -1,169 +1,207 @@
 // pages/api/polymarket.js
-
-// In-memory cache for 5 minutes
-let cachedData = null;
-let cacheTimestamp = 0;
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+/**
+ * Predictist Polymarket Aggregator API
+ * Combines Gamma + CLOB + Tickers endpoints to produce playable markets.
+ * Fully updated for 2025 schemas.
+ */
 
 export default async function handler(req, res) {
   try {
-    const now = Date.now();
-
-    // 🧠 Serve from cache if fresh
-    if (cachedData && now - cacheTimestamp < CACHE_DURATION_MS) {
-      console.log("⚡ Using cached Polymarket data");
-      return res.status(200).json(cachedData);
-    }
-
     console.log("🌐 Fetching fresh Polymarket data...");
 
-    // --- 1️⃣ Fetch Gamma (structure)
-    const gammaURL =
-      "https://gamma-api.polymarket.com/events?limit=1000&closed=false";
-    const gammaRes = await fetch(gammaURL, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-
-    const gammaBody = await gammaRes.json().catch(() => []);
-    const gammaEvents = Array.isArray(gammaBody) ? gammaBody : [];
-    console.log(`✅ Gamma fetched ${gammaEvents.length}`);
-
-    // --- 2️⃣ Fetch CLOB (live prices)
-    const clobURL = "https://clob.polymarket.com/markets?limit=1000";
-    const clobRes = await fetch(clobURL, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-
-    const clobBody = await clobRes.json().catch(() => []);
-    const clobMarkets = Array.isArray(clobBody)
-      ? clobBody
-      : Array.isArray(clobBody?.data)
-      ? clobBody.data
-      : [];
-    console.log(`✅ CLOB fetched ${clobMarkets.length}`);
-    console.log("🔍 Example CLOB market:", JSON.stringify(clobMarkets[0], null, 2));
-
-    // --- 3️⃣ Merge & normalize
-    const playable = [];
-
-    for (const e of gammaEvents) {
-      const market = e.markets?.[0];
-      if (!market) continue;
-
-      // Parse outcomes (Gamma gives string)
-      let outcomesArr = [];
-      try {
-        outcomesArr = JSON.parse(market.outcomes);
-      } catch {
-        outcomesArr = Array.isArray(market.outcomes) ? market.outcomes : [];
+    /* -----------------------------------------------------
+       1. Gamma API
+    ----------------------------------------------------- */
+    const gammaURL = "https://gamma-api.polymarket.com/events?limit=500&active=true";
+    let gammaEvents = [];
+    try {
+      const r = await fetch(gammaURL, {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+      if (r.ok) {
+        const body = await r.json();
+        gammaEvents = Array.isArray(body) ? body : body.data || [];
+        console.log(`✅ Gamma fetched ${gammaEvents.length}`);
+      } else {
+        console.warn("⚠️ Gamma API failed:", r.status);
       }
-      if (!Array.isArray(outcomesArr) || outcomesArr.length < 2) continue;
+    } catch (err) {
+      console.warn("⚠️ Gamma API error:", err.message);
+    }
 
-      // Match CLOB by slug/id
-      const clobMatch =
-        clobMarkets.find(
-          (m) =>
-            m.slug === e.slug ||
-            m.slug === market.slug ||
-            m.id === e.id ||
-            m.id === market.id
-        ) || null;
-
-            // --- Extract price data robustly
-            // --- Extract price data robustly (handles both outcomes[] and tokens[])
-      const o0 =
-        clobMatch?.outcomes?.[0] ||
-        clobMatch?.tokens?.[0] ||
-        null;
-      const o1 =
-        clobMatch?.outcomes?.[1] ||
-        clobMatch?.tokens?.[1] ||
-        null;
-
-      function extractPrice(o, fallback) {
-        if (!o) return fallback;
-        if (typeof o.price === "number") return o.price;
-        if (typeof o.last_price === "number") return o.last_price;
-        if (typeof o?.price?.mid === "number") return o.price.mid;
-        if (typeof o?.price?.yes === "number") return o.price.yes;
-        if (typeof o?.price?.no === "number") return 1 - o.price.no;
-        if (typeof o?.best_bid === "number" && typeof o?.best_ask === "number")
-          return (o.best_bid + o.best_ask) / 2;
-        if (typeof o?.best_bid === "number") return o.best_bid;
-        if (typeof o?.best_ask === "number") return 1 - o.best_ask;
-        return fallback;
+    /* -----------------------------------------------------
+       2. CLOB API
+    ----------------------------------------------------- */
+    const clobURL = "https://clob.polymarket.com/markets";
+    let clobMarkets = [];
+    try {
+      const clobRes = await fetch(clobURL, {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+      const clobBody = await clobRes.json().catch(() => []);
+      clobMarkets = Array.isArray(clobBody)
+        ? clobBody
+        : Array.isArray(clobBody?.data)
+        ? clobBody.data
+        : [];
+      console.log(`✅ CLOB fetched ${clobMarkets.length}`);
+      if (clobMarkets.length > 0) {
+        console.log("🔍 Example CLOB market:", JSON.stringify(clobMarkets[0], null, 2));
       }
+    } catch (err) {
+      console.warn("⚠️ CLOB fetch failed:", err.message);
+    }
 
-      // tokens[] use direct prices (0–1)
-      let yes = extractPrice(o0, 0.5);
-      let no = extractPrice(o1, 1 - yes);
+    /* -----------------------------------------------------
+       3. Tickers API (for live prices)
+    ----------------------------------------------------- */
+    const tickerURL = "https://clob.polymarket.com/tickers";
+    let priceMap = new Map();
+    try {
+      const tickerRes = await fetch(tickerURL, {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+      const tickerData = await tickerRes.json().catch(() => []);
+      console.log(`📈 Tickers fetched ${Array.isArray(tickerData) ? tickerData.length : 0}`);
 
-      // Handle inverted or identical prices
-      if (yes === no) {
-        if (yes === 1) {
-          yes = 1;
-          no = 0;
-        } else if (yes === 0) {
-          yes = 0;
-          no = 1;
-        } else {
-          no = 1 - yes;
+      if (Array.isArray(tickerData)) {
+        for (const t of tickerData) {
+          const key =
+            (t.market || t.slug || t.condition_id || t.token_yes || t.token_no || "").toLowerCase();
+          if (key && typeof t.last_price === "number") {
+            priceMap.set(key, {
+              yes: t.last_price,
+              bid: t.best_bid,
+              ask: t.best_ask,
+            });
+          }
         }
       }
+    } catch (err) {
+      console.warn("⚠️ Tickers fetch failed:", err.message);
+    }
 
-      // Clamp to [0,1]
+    /* -----------------------------------------------------
+       4. Merge + Normalize
+    ----------------------------------------------------- */
+    const merged = [...gammaEvents, ...clobMarkets];
+
+    function extractOutcomes(market) {
+      const outcomes =
+        Array.isArray(market.outcomes) && market.outcomes.length
+          ? market.outcomes
+          : Array.isArray(market.tokens)
+          ? market.tokens.map((t) => ({
+              name: t.name || t.outcome || "Option",
+              price: typeof t.price === "number" ? t.price : undefined,
+            }))
+          : [];
+
+      return outcomes.filter((o) => typeof o.price === "number");
+    }
+
+    const normalizeMarket = (raw) => {
+      const marketObj =
+        Array.isArray(raw.markets) && raw.markets.length > 0 ? raw.markets[0] : raw;
+
+      const q =
+        raw.question ||
+        raw.title ||
+        raw.name ||
+        marketObj.question ||
+        marketObj.title ||
+        "Untitled market";
+
+      const outcomes = extractOutcomes(marketObj);
+      const id =
+        marketObj.condition_id ||
+        raw.condition_id ||
+        marketObj.slug ||
+        raw.slug ||
+        raw.id ||
+        q;
+
+      // Determine prices
+      const o0 = outcomes[0];
+      const o1 = outcomes[1];
+
+      let yes =
+        typeof o0?.price === "number"
+          ? o0.price
+          : typeof o0?.last_price === "number"
+          ? o0.last_price
+          : 0.5;
+      let no =
+        typeof o1?.price === "number"
+          ? o1.price
+          : typeof o1?.last_price === "number"
+          ? o1.last_price
+          : 1 - yes;
+
+      // Overlay live ticker data if present
+      const tickerKey = (marketObj.market_slug || marketObj.slug || marketObj.condition_id || "")
+        .toLowerCase();
+      const ticker = priceMap.get(tickerKey);
+      if (ticker && typeof ticker.yes === "number" && ticker.yes > 0 && ticker.yes < 1) {
+        yes = ticker.yes;
+        no = 1 - yes;
+      }
+
+      // Clamp + cleanup
       yes = Math.max(0, Math.min(1, yes));
       no = Math.max(0, Math.min(1, no));
 
-
-      // Skip invalid or nonsensical markets
-      const q =
-        market.question || e.title || e.name || e.slug || "Untitled Market";
-      const lowerQ = q.toLowerCase();
-      if (
-        lowerQ.includes("test") ||
-        lowerQ.includes("archive") ||
-        /\b(2018|2019|2020|2021|2022|2023)\b/.test(lowerQ)
-      )
-        continue;
-
-      // Add to playable list
-      playable.push({
-        id: e.id || market.id,
+      return {
+        id,
         question: q.trim(),
         outcomes: [
-          { name: outcomesArr[0] || "Yes", price: yes },
-          { name: outcomesArr[1] || "No", price: no },
+          { name: "Yes", price: yes },
+          { name: "No", price: no },
         ],
+        image: raw.image || marketObj.image || null,
+        closed: raw.closed || marketObj.closed || false,
+        resolved: raw.resolved || false,
+      };
+    };
+
+    const normalized = merged
+      .map(normalizeMarket)
+      .filter((m) => {
+        if (!m.question || m.question.length < 8) return false;
+        if (m.closed || m.resolved) return false;
+        if (m.outcomes.some((o) => o.price === 0.5)) return true; // allow but lower priority
+        const valid = m.outcomes.some((o) => o.price > 0 && o.price < 1);
+        return valid;
       });
-    }
 
-    // --- 4️⃣ Clean & sort
-    const clean = playable
-      .filter(
-        (p) =>
-          p.question &&
-          p.question.length > 6 &&
-          p.outcomes.every((o) => o.price > 0 && o.price < 1)
-      )
-      .sort(() => Math.random() - 0.5); // shuffle for variety
+    /* -----------------------------------------------------
+       5. Deduplicate
+    ----------------------------------------------------- */
+    const seen = new Set();
+    const deduped = normalized.filter((m) => {
+      const key = m.question.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    console.log(`🎯 normalizeMarkets → ${clean.length} playable`);
-    clean.slice(0, 3).forEach((m) =>
-      console.log(
-        `• ${m.question} (${(m.outcomes[0].price * 100).toFixed(0)}%)`
-      )
-    );
+    /* -----------------------------------------------------
+       6. Respond
+    ----------------------------------------------------- */
+    console.log(`🎯 normalizeMarkets → ${deduped.length} playable`);
+    deduped.slice(0, 3).forEach((m) => {
+      const yes = Math.round(m.outcomes[0].price * 100);
+      console.log(`• ${m.question} (${yes}%)`);
+    });
 
-    // --- 5️⃣ Cache and return
-    cachedData = clean;
-    cacheTimestamp = now;
-    return res.status(200).json(clean);
+    res.status(200).json(deduped);
   } catch (err) {
-    console.error("❌ API route error:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("❌ Polymarket handler error:", err);
+    res.status(500).json({ error: "Internal server error", detail: err.message });
   }
 }
+
 
