@@ -1,17 +1,15 @@
 // pages/api/polymarket.js
-// ✅ Polymarket Live Markets API for Predictle
-// Combines caching, filtering, and real price parsing from CLOB endpoint
+// ✅ Predictle Live Polymarket API (Gamma + CLOB + /prices fallback)
 
-// In-memory cache (5 minutes)
 let cachedData = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 min
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export default async function handler(req, res) {
   try {
     const now = Date.now();
 
-    // 🧠 Serve from cache if recent
+    // Serve from cache if recent
     if (cachedData && now - cacheTimestamp < CACHE_DURATION_MS) {
       console.log("⚡ Using cached Polymarket data");
       return res.status(200).json(cachedData);
@@ -19,55 +17,100 @@ export default async function handler(req, res) {
 
     console.log("🌐 Fetching fresh Polymarket data…");
 
-    // --- 1️⃣ Fetch live markets from Polymarket CLOB REST API
-    const url = "https://clob.polymarket.com/markets?active=true&closed=false&archived=false&limit=1000";
-    const response = await fetch(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
+    // --- 1️⃣ Gamma: Fetch open events (metadata + structure)
+    const gammaURL = "https://gamma-api.polymarket.com/events?closed=false&limit=1000";
+    const gammaRes = await fetch(gammaURL, { headers: { accept: "application/json" } });
+    const gammaData = await gammaRes.json();
+    const gammaEvents = Array.isArray(gammaData) ? gammaData : [];
+    console.log(`✅ Gamma fetched ${gammaEvents.length}`);
+
+    // --- 2️⃣ CLOB: Fetch market details (for price/token IDs)
+    const clobURL = "https://clob.polymarket.com/markets?limit=1000";
+    const clobRes = await fetch(clobURL, { headers: { accept: "application/json" } });
+    const clobBody = await clobRes.json();
+    const clobMarkets = clobBody?.data || clobBody || [];
+    console.log(`✅ CLOB fetched ${clobMarkets.length}`);
+
+    // --- 3️⃣ Collect all token IDs for fallback price check
+    const tokenIds = clobMarkets
+      .flatMap((m) => (m.tokens || []).map((t) => t.token_id))
+      .filter(Boolean)
+      .slice(0, 1000); // avoid huge payloads
+
+    // --- 4️⃣ Fetch live prices (POST /prices)
+    const pricesURL = "https://clob.polymarket.com/prices";
+    const priceRes = await fetch(pricesURL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token_ids: tokenIds }),
     });
 
-    const body = await response.json();
-    const markets = body?.data || body || [];
-    console.log(`✅ Pulled ${markets.length} markets`);
+    const priceData = await priceRes.json();
+    const priceMap = Array.isArray(priceData)
+      ? Object.fromEntries(priceData.map((p) => [p.token_id, p.price]))
+      : {};
+    console.log(`📊 Price fallback received ${Object.keys(priceMap).length} tokens`);
 
-    // --- 2️⃣ Normalize and filter
-const playable = [];
+    // --- 5️⃣ Merge Gamma + CLOB + Prices
+    const playable = [];
 
-for (const m of markets) {
-  if (!m?.question || !m?.tokens || m.tokens.length < 2) continue;
+    for (const event of gammaEvents) {
+      const market = event.markets?.[0];
+      if (!market) continue;
 
-  const outcomes = m.tokens.map((t) => t.outcome);
-  const yes = typeof m.tokens[0].price === "number" ? m.tokens[0].price : 0.5;
-  const no = typeof m.tokens[1].price === "number" ? m.tokens[1].price : 1 - yes;
+      // Find CLOB match
+      const clobMatch = clobMarkets.find(
+        (m) => m.condition_id === market.condition_id
+      );
+      if (!clobMatch || !clobMatch.tokens || clobMatch.tokens.length < 2) continue;
 
-  const q = m.question.trim();
-  const lowerQ = q.toLowerCase();
+      const tokens = clobMatch.tokens;
 
-  // ⛔ Skip test/archive/old markets
-  if (
-    lowerQ.includes("test") ||
-    lowerQ.includes("archive") ||
-    /\b(2018|2019|2020|2021|2022|2023|2024)\b/.test(lowerQ)
-  ) continue;
+      // Extract prices — use CLOB first, fallback to /prices
+      const yesToken = tokens[0];
+      const noToken = tokens[1];
+      const yes =
+        typeof yesToken.price === "number"
+          ? yesToken.price
+          : typeof priceMap[yesToken.token_id] === "number"
+          ? priceMap[yesToken.token_id]
+          : 0.5;
+      const no =
+        typeof noToken.price === "number"
+          ? noToken.price
+          : typeof priceMap[noToken.token_id] === "number"
+          ? priceMap[noToken.token_id]
+          : 1 - yes;
 
-  // 🕒 Skip markets that have already ended
-  const endTime = m.end_date_iso ? new Date(m.end_date_iso).getTime() : null;
-  const now = Date.now();
-  if (endTime && endTime < now) continue;
+      const q = market.question || event.title || "Untitled Market";
+      const lowerQ = q.toLowerCase();
 
-  // ✅ Add only future/active markets
-  playable.push({
-    id: m.condition_id || m.id,
-    question: q,
-    outcomes: [
-      { name: outcomes[0] || "Yes", price: yes },
-      { name: outcomes[1] || "No", price: no },
-    ],
-  });
-}
+      // Skip test/archive/old markets
+      if (
+        lowerQ.includes("test") ||
+        lowerQ.includes("archive") ||
+        /\b(2018|2019|2020|2021|2022|2023|2024)\b/.test(lowerQ)
+      )
+        continue;
 
+      // Skip expired markets
+      const endTime = market.end_date_iso
+        ? new Date(market.end_date_iso).getTime()
+        : null;
+      if (endTime && endTime < now) continue;
 
-    // --- 3️⃣ Clean and shuffle
+      // ✅ Add to playable
+      playable.push({
+        id: event.id || market.id,
+        question: q.trim(),
+        outcomes: [
+          { name: tokens[0].outcome || "Yes", price: yes },
+          { name: tokens[1].outcome || "No", price: no },
+        ],
+      });
+    }
+
+    // --- 6️⃣ Clean, randomize, cache
     const clean = playable
       .filter(
         (p) =>
@@ -83,7 +126,6 @@ for (const m of markets) {
       )
     );
 
-    // --- 4️⃣ Cache and respond
     cachedData = clean;
     cacheTimestamp = now;
     return res.status(200).json(clean);
