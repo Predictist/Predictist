@@ -1,151 +1,57 @@
 // pages/api/polymarket.js
-/**
- * Predictle Market Fetcher (resilient version)
- * - Primary: Gamma API (freshest, structured)
- * - Fallback: CLOB API (legacy, simple)
- * - Auto-trims to avoid 4MB limit
- * - Filters for playable binary markets
- * - Caches for 5 minutes in memory
- */
 
-let cached = { data: null, timestamp: 0 };
+// In-memory cache for 5 minutes
+let cachedData = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export default async function handler(req, res) {
   try {
     const now = Date.now();
 
-    // ---------- Cache Check ----------
-    if (cached.data && now - cached.timestamp < 5 * 60 * 1000) {
+    // 🧠 Serve from cache if fresh
+    if (cachedData && now - cacheTimestamp < CACHE_DURATION_MS) {
       console.log("⚡ Using cached Polymarket data");
-      return res.status(200).json(cached.data);
+      return res.status(200).json(cachedData);
     }
 
     console.log("🌐 Fetching fresh Polymarket data...");
 
-    // ---------- 1. Try Gamma API ----------
-    let events = await tryGammaAPI();
-    let source = "Gamma";
-
-    // ---------- 2. Fallback to CLOB API ----------
-    if (!events?.length) {
-      console.warn("⚠️ Gamma API failed, falling back to CLOB...");
-      events = await tryClobAPI();
-      source = "CLOB";
-    }
-
-    // ---------- 3. If both fail ----------
-    if (!events?.length) {
-      console.error("❌ No markets fetched from Gamma or CLOB!");
-      return res.status(502).json({ error: "Failed to fetch any markets." });
-    }
-
-    // ---------- 4. Normalize & Trim ----------
-    const playable = normalizeMarkets(events);
-
-    console.log(
-      `✅ ${source} fetched ${events.length} • playable ${playable.length} • ${new Date().toISOString()}`
-    );
-
-    // ---------- 5. Cache Result ----------
-    cached = { data: playable, timestamp: now };
-
-    return res.status(200).json(playable);
-  } catch (err) {
-    console.error("❌ API route error:", err);
-    return res.status(500).json({ error: "Server error fetching Polymarket markets" });
-  }
-}
-
-/* -------------------------------------------------------
-   Gamma API — paginated fetch (modern Polymarket)
-------------------------------------------------------- */
-async function tryGammaAPI() {
-  const limitPerPage = 200;
-  const maxPages = 3;
-  const allEvents = [];
-
-  for (let page = 0; page < maxPages; page++) {
-    const offset = page * limitPerPage;
-    const url = `https://gamma-api.polymarket.com/events?closed=false&limit=${limitPerPage}&ascending=false&offset=${offset}`;
-
-    // pages/api/polymarket.js
-    try {
-      console.log("🌐 Fetching fresh Polymarket data...");
-      const url = "https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=1500";
-      const r = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
-
-      if (!r.ok) throw new Error(`Gamma API returned ${r.status}`);
-
-      const body = await r.json();
-      if (!Array.isArray(body)) throw new Error("Gamma response not array");
-
-      // Log one sample safely
-      if (body.length > 0) console.log("🔍 Example raw event:", JSON.stringify(body[0], null, 2));
-
-      const events = body;
-      const normalized = normalizeMarkets(events);
-
-      if (!normalized.length) throw new Error("Gamma returned 0 playable");
-
-      console.log(`✅ Gamma fetched ${events.length} • playable ${normalized.length}`);
-      return res.status(200).json(normalized);
-    } catch (err) {
-      console.warn("⚠️ Gamma API failed, falling back to CLOB...", err.message);
-    }
-
-  }
-  return allEvents;
-}
-
-/* -------------------------------------------------------
-   CLOB API — backup source (legacy Polymarket)
-------------------------------------------------------- */
-async function tryClobAPI() {
-  try {
-    const r = await fetch("https://clob.polymarket.com/markets", {
+    // --- 1️⃣ Fetch Gamma (structure)
+    const gammaURL =
+      "https://gamma-api.polymarket.com/events?limit=1000&closed=false";
+    const gammaRes = await fetch(gammaURL, {
       headers: { accept: "application/json" },
       cache: "no-store",
     });
-    if (!r.ok) throw new Error(`CLOB API HTTP ${r.status}`);
-    const data = await r.json();
-    return Array.isArray(data) ? data : data?.data || [];
-  } catch (err) {
-    console.error("CLOB API fetch failed:", err);
-    return [];
-  }
-}
 
-/* -------------------------------------------------------
-   Normalize + Filter
-   Ensures we only return playable binary markets
-------------------------------------------------------- */
-// pages/api/polymarket.js
-export default async function handler(req, res) {
-  try {
-    console.log("🌐 Fetching fresh Polymarket data...");
-
-    // --- 1️⃣ Gamma (structure only)
-    const gammaURL = "https://gamma-api.polymarket.com/events?limit=1000&closed=false";
-    const gammaRes = await fetch(gammaURL, { headers: { accept: "application/json" } });
-    const gammaBody = await gammaRes.json();
+    const gammaBody = await gammaRes.json().catch(() => []);
     const gammaEvents = Array.isArray(gammaBody) ? gammaBody : [];
     console.log(`✅ Gamma fetched ${gammaEvents.length}`);
 
-    // --- 2️⃣ CLOB (for live odds/prices)
+    // --- 2️⃣ Fetch CLOB (live prices)
     const clobURL = "https://clob.polymarket.com/markets?limit=1000";
-    const clobRes = await fetch(clobURL, { headers: { accept: "application/json" } });
-    const clobBody = await clobRes.json();
-    const clobMarkets = Array.isArray(clobBody) ? clobBody : [];
+    const clobRes = await fetch(clobURL, {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+
+    const clobBody = await clobRes.json().catch(() => []);
+    const clobMarkets = Array.isArray(clobBody)
+      ? clobBody
+      : Array.isArray(clobBody?.data)
+      ? clobBody.data
+      : [];
     console.log(`✅ CLOB fetched ${clobMarkets.length}`);
 
-    // --- 3️⃣ Merge + normalize
+    // --- 3️⃣ Merge & normalize
     const playable = [];
 
     for (const e of gammaEvents) {
       const market = e.markets?.[0];
       if (!market) continue;
 
-      // Outcomes (stringified JSON)
+      // Parse outcomes (Gamma gives string)
       let outcomesArr = [];
       try {
         outcomesArr = JSON.parse(market.outcomes);
@@ -154,45 +60,85 @@ export default async function handler(req, res) {
       }
       if (!Array.isArray(outcomesArr) || outcomesArr.length < 2) continue;
 
-      // Match with CLOB by slug or id
+      // Match CLOB by slug/id
       const clobMatch =
-        clobMarkets.find((m) => m.slug === e.slug || m.slug === market.slug) || null;
+        clobMarkets.find(
+          (m) =>
+            m.slug === e.slug ||
+            m.slug === market.slug ||
+            m.id === e.id ||
+            m.id === market.id
+        ) || null;
 
-      const yesPrice =
-        typeof clobMatch?.outcomes?.[0]?.price === "number"
-          ? clobMatch.outcomes[0].price
+      const o0 = clobMatch?.outcomes?.[0];
+      const o1 = clobMatch?.outcomes?.[1];
+
+      // Get prices with fallbacks
+      let yes =
+        typeof o0?.price === "number"
+          ? o0.price
+          : typeof o0?.last_price === "number"
+          ? o0.last_price
+          : typeof o0?.price?.mid === "number"
+          ? o0.price.mid
           : 0.5;
-      const noPrice = 1 - yesPrice;
+      let no =
+        typeof o1?.price === "number"
+          ? o1.price
+          : typeof o1?.last_price === "number"
+          ? o1.last_price
+          : 1 - yes;
 
-      // Build playable record
+      // Clamp to [0,1]
+      yes = Math.max(0, Math.min(1, yes));
+      no = Math.max(0, Math.min(1, no));
+
+      // Skip invalid or nonsensical markets
+      const q =
+        market.question || e.title || e.name || e.slug || "Untitled Market";
+      const lowerQ = q.toLowerCase();
+      if (
+        lowerQ.includes("test") ||
+        lowerQ.includes("archive") ||
+        /\b(2018|2019|2020|2021|2022|2023)\b/.test(lowerQ)
+      )
+        continue;
+
+      // Add to playable list
       playable.push({
         id: e.id || market.id,
-        question: market.question || e.title || e.slug,
+        question: q.trim(),
         outcomes: [
-          { name: outcomesArr[0] || "Yes", price: yesPrice },
-          { name: outcomesArr[1] || "No", price: noPrice },
+          { name: outcomesArr[0] || "Yes", price: yes },
+          { name: outcomesArr[1] || "No", price: no },
         ],
       });
     }
 
-    // Filter out nonsense / empty ones
-    const clean = playable.filter(
-      (p) =>
-        p.question &&
-        p.question.length > 6 &&
-        p.outcomes.every((o) => o.price > 0 && o.price < 1)
-    );
+    // --- 4️⃣ Clean & sort
+    const clean = playable
+      .filter(
+        (p) =>
+          p.question &&
+          p.question.length > 6 &&
+          p.outcomes.every((o) => o.price > 0 && o.price < 1)
+      )
+      .sort(() => Math.random() - 0.5); // shuffle for variety
 
     console.log(`🎯 normalizeMarkets → ${clean.length} playable`);
-    if (clean.length) {
-      clean.slice(0, 3).forEach((m) =>
-        console.log(`• ${m.question} (${(m.outcomes[0].price * 100).toFixed(0)}%)`)
-      );
-    }
+    clean.slice(0, 3).forEach((m) =>
+      console.log(
+        `• ${m.question} (${(m.outcomes[0].price * 100).toFixed(0)}%)`
+      )
+    );
 
-    res.status(200).json(clean);
+    // --- 5️⃣ Cache and return
+    cachedData = clean;
+    cacheTimestamp = now;
+    return res.status(200).json(clean);
   } catch (err) {
     console.error("❌ API route error:", err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }
+
