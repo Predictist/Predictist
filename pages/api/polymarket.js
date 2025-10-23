@@ -108,27 +108,23 @@ async function tryClobAPI() {
    Ensures we only return playable binary markets
 ------------------------------------------------------- */
 function normalizeMarkets(events) {
-  const slimmed = events
-    .filter((e) => e.markets && e.markets.length > 0)
-    .map((e) => ({
-      id: e.id,
-      question: e.question || e.title || "",
-      markets: e.markets.slice(0, 1).map((m) => ({
-        slug: m.slug,
-        outcomes: m.outcomes || m.tokens || m.order_books || [],
-        resolved: m.resolved || false,
-        closed: m.closed || false,
-      })),
-    }))
-    .filter((e) => e.question && e.question.length > 5);
+  const playable = [];
 
-  const playable = slimmed.filter((e) => {
-    const m = e.markets?.[0];
-    const outcomes = Array.isArray(m?.outcomes) ? m.outcomes : [];
-    if (outcomes.length < 2) return false;
+  for (const e of events) {
+    if (!e || !e.markets || !e.markets.length) continue;
+    const q = (e.question || e.title || "").trim();
+    if (q.length < 5) continue;
 
-    // Extract usable prices
+    const m = e.markets[0];
+    if (!m) continue;
+
+    // Detect possible outcome arrays
+    const outcomes = m.outcomes || m.tokens || m.order_books || [];
+    if (outcomes.length < 2) continue;
+
+    // Extract usable prices flexibly
     const parsed = outcomes.map((o) => {
+      // Try every possible numeric field
       let price =
         typeof o.price === "number"
           ? o.price
@@ -138,28 +134,51 @@ function normalizeMarkets(events) {
           ? o.price.mid
           : typeof o?.price?.yes === "number"
           ? o.price.yes
+          : typeof o?.best_bid === "number"
+          ? o.best_bid
+          : typeof o?.best_ask === "number"
+          ? (o.best_bid + o.best_ask) / 2
           : undefined;
-      if (price === undefined && typeof o.bid_price === "number") price = o.bid_price;
-      if (price === undefined && typeof o.ask_price === "number") price = o.ask_price;
       return price;
     });
 
-    // Recover missing price if one side missing
+    // Recover missing prices (if one side missing)
     if (parsed[0] != null && parsed[1] == null) parsed[1] = 1 - parsed[0];
     if (parsed[1] != null && parsed[0] == null) parsed[0] = 1 - parsed[1];
 
     // Validate
-    const valid = parsed.every((p) => typeof p === "number" && p >= 0 && p <= 1);
-    if (!valid) return false;
+    const valid = parsed.every((p) => typeof p === "number" && p > 0 && p < 1);
+    if (!valid) continue;
 
-    const lowerQ = e.question.toLowerCase();
+    const lowerQ = q.toLowerCase();
+    if (lowerQ.includes("test") || lowerQ.includes("archive")) continue;
     const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(lowerQ);
+    if (looksOld) continue;
 
-    return !m.resolved && !m.closed && !looksOld && !lowerQ.includes("test");
-  });
+    playable.push({
+      id: e.id,
+      question: q,
+      markets: [
+        {
+          slug: m.slug || m.id || e.id,
+          outcomes: [
+            { name: outcomes[0]?.name || outcomes[0]?.token_name || "Yes", price: parsed[0] },
+            { name: outcomes[1]?.name || outcomes[1]?.token_name || "No", price: parsed[1] },
+          ],
+        },
+      ],
+    });
+  }
+
+  console.log(`🎯 normalizeMarkets → ${playable.length} playable`);
+  // Optional: log a few examples
+  playable.slice(0, 3).forEach((m) =>
+    console.log(`• ${m.question} (${m.markets[0].outcomes[0].price.toFixed(2)} / ${m.markets[0].outcomes[1].price.toFixed(2)})`)
+  );
 
   return playable;
 }
+
 
 
 
