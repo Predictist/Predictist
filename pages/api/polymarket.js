@@ -115,21 +115,21 @@ function normalizeMarkets(events) {
       question: e.question || e.title || "",
       markets: e.markets.slice(0, 1).map((m) => ({
         slug: m.slug,
-        outcomes: m.outcomes || m.tokens || [],
+        outcomes: m.outcomes || m.tokens || m.order_books || [],
         resolved: m.resolved || false,
         closed: m.closed || false,
       })),
     }))
     .filter((e) => e.question && e.question.length > 5);
 
-  // Binary markets only
   const playable = slimmed.filter((e) => {
     const m = e.markets?.[0];
     const outcomes = Array.isArray(m?.outcomes) ? m.outcomes : [];
-    if (outcomes.length !== 2) return false;
+    if (outcomes.length < 2) return false;
 
-    const hasPrices = outcomes.every((o) => {
-      const p =
+    // Extract usable prices
+    const parsed = outcomes.map((o) => {
+      let price =
         typeof o.price === "number"
           ? o.price
           : typeof o.last_price === "number"
@@ -139,17 +139,28 @@ function normalizeMarkets(events) {
           : typeof o?.price?.yes === "number"
           ? o.price.yes
           : undefined;
-      return typeof p === "number" && p > 0 && p < 1;
+      if (price === undefined && typeof o.bid_price === "number") price = o.bid_price;
+      if (price === undefined && typeof o.ask_price === "number") price = o.ask_price;
+      return price;
     });
+
+    // Recover missing price if one side missing
+    if (parsed[0] != null && parsed[1] == null) parsed[1] = 1 - parsed[0];
+    if (parsed[1] != null && parsed[0] == null) parsed[0] = 1 - parsed[1];
+
+    // Validate
+    const valid = parsed.every((p) => typeof p === "number" && p >= 0 && p <= 1);
+    if (!valid) return false;
 
     const lowerQ = e.question.toLowerCase();
     const looksOld = /\b(2018|2019|2020|2021|2022|2023)\b/i.test(lowerQ);
 
-    return hasPrices && !m.resolved && !m.closed && !looksOld && !lowerQ.includes("test");
+    return !m.resolved && !m.closed && !looksOld && !lowerQ.includes("test");
   });
 
   return playable;
 }
+
 
 
 
