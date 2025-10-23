@@ -71,6 +71,7 @@ async function tryGammaAPI() {
     try {
       const r = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
       if (!r.ok) break;
+      console.log("🔍 Example raw event:", JSON.stringify(data[0], null, 2));
       const body = await r.json();
       const events = Array.isArray(body)
         ? body
