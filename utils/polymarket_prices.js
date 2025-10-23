@@ -1,13 +1,13 @@
 import pkg from "@polymarket/clob-client";
-const { CLOBClient } = pkg;
+const { ClobClient } = pkg;
 import { Wallet, JsonRpcProvider } from "ethers";
+import "dotenv/config";
 
-const PRIVATE_KEY = "d211e96230f8e924dc939e961ff49a1eeda6394ce2c26dca3214d394bd2e4fde"; // Use env var in production
 const provider = new JsonRpcProvider("https://polygon-rpc.com");
-const signer = new Wallet(PRIVATE_KEY, provider);
+const signer = new Wallet(process.env.PRIVATE_KEY, provider);
 
 async function fetchMarkets() {
-  const client = new CLOBClient({ signer });
+  const client = new ClobClient({ signer }); // 👈 correct constructor name
   const markets = await client.getMarkets({ limit: 50, closed: false });
 
   console.log(`✅ Pulled ${markets.length} markets`);
