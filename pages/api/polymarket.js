@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
     console.log("🌐 Fetching fresh Polymarket data...");
 
-    // --- 1️⃣ Fetch Gamma (structure)
+    // --- 1️⃣ Fetch Gamma (market structure)
     const gammaURL =
       "https://gamma-api.polymarket.com/events?limit=1000&closed=false";
     const gammaRes = await fetch(gammaURL, {
@@ -29,20 +29,29 @@ export default async function handler(req, res) {
     const gammaEvents = Array.isArray(gammaBody) ? gammaBody : [];
     console.log(`✅ Gamma fetched ${gammaEvents.length}`);
 
-    // --- 2️⃣ Fetch CLOB (live prices)
-    const clobURL = "https://r.jina.ai/https://clob.polymarket.com/markets?limit=1000";
-    const clobRes = await fetch(clobURL, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
+    // --- 2️⃣ Fetch live prices via GraphQL (CLOB replacement)
+    const gqlQuery = `
+      {
+        markets(limit: 1000, closed: false) {
+          id
+          slug
+          question
+          conditionId
+          yesPrice
+          noPrice
+        }
+      }
+    `;
+
+    const clobRes = await fetch("https://gamma-api.polymarket.com/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: gqlQuery }),
     });
 
-    const clobBody = await clobRes.json().catch(() => []);
-    const clobMarkets = Array.isArray(clobBody)
-      ? clobBody
-      : Array.isArray(clobBody?.data)
-      ? clobBody.data
-      : [];
-    console.log(`✅ CLOB fetched ${clobMarkets.length}`);
+    const clobData = await clobRes.json().catch(() => ({}));
+    const clobMarkets = clobData?.data?.markets || [];
+    console.log(`✅ CLOB (GraphQL) fetched ${clobMarkets.length}`);
 
     // --- 3️⃣ Merge & normalize
     const playable = [];
@@ -60,59 +69,30 @@ export default async function handler(req, res) {
       }
       if (!Array.isArray(outcomesArr) || outcomesArr.length < 2) continue;
 
-      // Match CLOB by slug/id
+      // Match GraphQL market by conditionId or slug
       const clobMatch =
-  clobMarkets.find(
-    (m) =>
-      m.conditionId === e.condition_id ||
-      m.conditionId === market.condition_id ||
-      m.condition_id === e.condition_id ||
-      m.slug === e.slug ||
-      m.slug === market.slug ||
-      m.id === e.id ||
-      m.id === market.id
-  ) || null;
-  if (!clobMatch) {
-  // no match at all
-  continue;
-}
+        clobMarkets.find(
+          (m) =>
+            m.conditionId === market.condition_id ||
+            m.slug === market.slug ||
+            m.id === market.id
+        ) || null;
 
-// temporary debugging — will print one matched market
-if (Math.random() < 0.02) {
-  console.log("🔎 CLOB match example:", {
-    slug: clobMatch.slug,
-    id: clobMatch.id,
-    keys: Object.keys(clobMatch),
-    outcomes: clobMatch.outcomes?.slice(0, 2),
-  });
-}
-
-
-
-      const o0 = clobMatch?.outcomes?.[0];
-      const o1 = clobMatch?.outcomes?.[1];
-
-      // Get prices with fallbacks
+      // Pull real prices if available
       let yes =
-        typeof o0?.price === "number"
-          ? o0.price
-          : typeof o0?.last_price === "number"
-          ? o0.last_price
-          : typeof o0?.price?.mid === "number"
-          ? o0.price.mid
+        typeof clobMatch?.yesPrice === "number"
+          ? clobMatch.yesPrice
           : 0.5;
       let no =
-        typeof o1?.price === "number"
-          ? o1.price
-          : typeof o1?.last_price === "number"
-          ? o1.last_price
+        typeof clobMatch?.noPrice === "number"
+          ? clobMatch.noPrice
           : 1 - yes;
 
       // Clamp to [0,1]
       yes = Math.max(0, Math.min(1, yes));
       no = Math.max(0, Math.min(1, no));
 
-      // Skip invalid or nonsensical markets
+      // Skip test/archive markets
       const q =
         market.question || e.title || e.name || e.slug || "Untitled Market";
       const lowerQ = q.toLowerCase();
@@ -123,7 +103,6 @@ if (Math.random() < 0.02) {
       )
         continue;
 
-      // Add to playable list
       playable.push({
         id: e.id || market.id,
         question: q.trim(),
@@ -134,7 +113,7 @@ if (Math.random() < 0.02) {
       });
     }
 
-    // --- 4️⃣ Clean & sort
+    // --- 4️⃣ Clean & shuffle
     const clean = playable
       .filter(
         (p) =>
@@ -142,7 +121,7 @@ if (Math.random() < 0.02) {
           p.question.length > 6 &&
           p.outcomes.every((o) => o.price > 0 && o.price < 1)
       )
-      .sort(() => Math.random() - 0.5); // shuffle for variety
+      .sort(() => Math.random() - 0.5);
 
     console.log(`🎯 normalizeMarkets → ${clean.length} playable`);
     clean.slice(0, 3).forEach((m) =>
@@ -160,6 +139,7 @@ if (Math.random() < 0.02) {
     return res.status(500).json({ error: err.message });
   }
 }
+
 
 
 
