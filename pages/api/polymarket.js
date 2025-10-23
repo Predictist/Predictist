@@ -43,6 +43,7 @@ export default async function handler(req, res) {
       ? clobBody.data
       : [];
     console.log(`✅ CLOB fetched ${clobMarkets.length}`);
+    console.log("🔍 Example CLOB market:", JSON.stringify(clobMarkets[0], null, 2));
 
     // --- 3️⃣ Merge & normalize
     const playable = [];
