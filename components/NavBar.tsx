@@ -3,13 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import SignalWave from '@/components/SignalWave'; // animated logo component
+import SignalWave from '@/components/SignalWave';
 
 const links = [
-  { href: '/', label: 'Home' },
   { href: '/predictle', label: 'Predictle' },
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/subscribe', label: 'Subscribe' },
 ];
 
 export default function NavBar() {
@@ -44,7 +42,7 @@ export default function NavBar() {
           margin: '0 auto',
         }}
       >
-        {/* Logo + Wordmark */}
+        {/* Left: Logo */}
         <Link
           href="/"
           style={{
@@ -60,24 +58,22 @@ export default function NavBar() {
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
               fontSize: '1.28rem',
-              color: '#F9FAFB', // clean white text
+              color: '#F9FAFB',
               letterSpacing: '-0.02em',
-              lineHeight: 1,
             }}
           >
             Predictist
           </span>
         </Link>
 
-        {/* Navigation Links */}
+        {/* Center: Links */}
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               style={{
-                color:
-                  pathname === link.href ? '#FFFFFF' : '#A1A1AA',
+                color: pathname === link.href ? '#FFFFFF' : '#A1A1AA',
                 fontWeight: pathname === link.href ? 600 : 500,
                 textDecoration: 'none',
                 transition: 'color 0.25s ease',
@@ -86,6 +82,35 @@ export default function NavBar() {
               {link.label}
             </Link>
           ))}
+        </div>
+
+        {/* Right: Auth actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Link
+            href="#"
+            style={{
+              color: '#A1A1AA',
+              fontWeight: 500,
+              textDecoration: 'none',
+              fontSize: '0.95rem',
+            }}
+          >
+            Log in
+          </Link>
+          <Link
+            href="#"
+            style={{
+              background: '#F9FAFB',
+              color: '#0A0A0A',
+              fontWeight: 600,
+              borderRadius: '8px',
+              padding: '0.5rem 1.25rem',
+              textDecoration: 'none',
+              fontSize: '0.95rem',
+            }}
+          >
+            Sign up
+          </Link>
         </div>
       </nav>
     </header>
