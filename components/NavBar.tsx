@@ -3,10 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import ThemeToggle from './ThemeToggle';
-import SignalWave from '@/components/SignalWave'; // ✅ animated logo component
+import SignalWave from '@/components/SignalWave'; // animated logo component
 
-// Navigation links
 const links = [
   { href: '/', label: 'Home' },
   { href: '/predictle', label: 'Predictle' },
@@ -18,7 +16,6 @@ export default function NavBar() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
-  // Adds scroll effect for translucent header
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', onScroll);
@@ -32,10 +29,8 @@ export default function NavBar() {
         top: 0,
         zIndex: 50,
         backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid var(--card-border)',
-        background: scrolled
-          ? 'rgba(14,17,22,0.85)'
-          : 'rgba(14,17,22,0.55)',
+        background: scrolled ? 'rgba(10,10,10,0.9)' : 'rgba(10,10,10,0.7)',
+        borderBottom: '1px solid #1A1A1A',
         transition: 'background 0.3s ease, border 0.3s ease',
       }}
     >
@@ -44,7 +39,9 @@ export default function NavBar() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '1rem 2rem',
+          padding: '0.75rem 2rem',
+          maxWidth: '1200px',
+          margin: '0 auto',
         }}
       >
         {/* Logo + Wordmark */}
@@ -57,19 +54,13 @@ export default function NavBar() {
             textDecoration: 'none',
           }}
         >
-          {/* Animated signal wave */}
           <SignalWave animated size={34} strokeWidth={3} />
-
-          {/* Predictist wordmark */}
           <span
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
               fontSize: '1.28rem',
-              background: 'linear-gradient(90deg, var(--accent), #6aa5ff)',
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: '#F9FAFB', // clean white text
               letterSpacing: '-0.02em',
               lineHeight: 1,
             }}
@@ -78,7 +69,7 @@ export default function NavBar() {
           </span>
         </Link>
 
-        {/* Nav Links + Theme Toggle */}
+        {/* Navigation Links */}
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           {links.map((link) => (
             <Link
@@ -86,15 +77,15 @@ export default function NavBar() {
               href={link.href}
               style={{
                 color:
-                  pathname === link.href ? 'var(--accent)' : 'var(--text)',
+                  pathname === link.href ? '#FFFFFF' : '#A1A1AA',
                 fontWeight: pathname === link.href ? 600 : 500,
+                textDecoration: 'none',
                 transition: 'color 0.25s ease',
               }}
             >
               {link.label}
             </Link>
           ))}
-          <ThemeToggle />
         </div>
       </nav>
     </header>
