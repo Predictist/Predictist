@@ -23,7 +23,7 @@ export default function HomePage() {
       }}
     >
       {/* ================= HERO ================= */}
-      <section>
+      <section className="fade-in">
         <div style={{ marginBottom: '2rem' }}>
           <SignalWave animated size={80} strokeWidth={4} />
         </div>
@@ -32,9 +32,7 @@ export default function HomePage() {
             fontSize: 'clamp(2rem, 5vw, 3.5rem)',
             fontWeight: 700,
             marginBottom: '1rem',
-            background: 'linear-gradient(90deg, var(--accent), #6aa5ff)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: '#F9FAFB',
           }}
         >
           See what the world believes will happen.
@@ -44,6 +42,8 @@ export default function HomePage() {
             color: 'var(--text-muted)',
             fontSize: '1.2rem',
             marginBottom: '2rem',
+            maxWidth: '700px',
+            marginInline: 'auto',
           }}
         >
           Predictist combines data, dashboards, and games to track global expectations in real time.
@@ -56,38 +56,26 @@ export default function HomePage() {
             flexWrap: 'wrap',
           }}
         >
-          <Link
-            href="/predictle"
-            className="button-accent"
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'var(--accent)',
-              color: 'white',
-              borderRadius: '8px',
-              fontWeight: 600,
-            }}
-          >
+          <Link href="/predictle" className="button-accent">
             🎮 Play Predictle
           </Link>
-          <Link
-            href="/dashboard"
-            className="button-secondary"
-            style={{
-              padding: '0.75rem 1.5rem',
-              border: '1px solid var(--card-border)',
-              borderRadius: '8px',
-              color: 'var(--text)',
-              fontWeight: 600,
-            }}
-          >
+          <Link href="/dashboard" className="button-secondary">
             📊 Explore Dashboard
           </Link>
         </div>
       </section>
 
       {/* ================= FEATURES ================= */}
-      <section style={{ width: '100%' }}>
-        <h2 style={{ fontSize: '2rem', marginBottom: '2rem' }}>The Predictist Ecosystem</h2>
+      <section className="fade-in" style={{ width: '100%' }}>
+        <h2
+          style={{
+            fontSize: '2rem',
+            marginBottom: '2rem',
+            color: '#F9FAFB',
+          }}
+        >
+          The Predictist Ecosystem
+        </h2>
         <div
           style={{
             display: 'grid',
@@ -116,15 +104,32 @@ export default function HomePage() {
               key={f.title}
               href={f.href}
               style={{
-                border: '1px solid var(--card-border)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '2rem',
                 textAlign: 'left',
-                background: 'rgba(255,255,255,0.03)',
-                transition: 'transform 0.2s ease, border 0.2s ease',
+                background: 'var(--surface)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease',
+                textDecoration: 'none',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)';
+                (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+                (e.currentTarget as HTMLElement).style.transform = 'none';
               }}
             >
-              <h3 style={{ marginBottom: '0.75rem', fontSize: '1.5rem' }}>{f.title}</h3>
+              <h3
+                style={{
+                  marginBottom: '0.75rem',
+                  fontSize: '1.5rem',
+                  color: '#F9FAFB',
+                }}
+              >
+                {f.title}
+              </h3>
               <p style={{ color: 'var(--text-muted)' }}>{f.desc}</p>
             </Link>
           ))}
@@ -132,8 +137,16 @@ export default function HomePage() {
       </section>
 
       {/* ================= TRENDING MARKETS ================= */}
-      <section style={{ width: '100%' }}>
-        <h2 style={{ fontSize: '2rem', marginBottom: '2rem' }}>Top Trending Markets</h2>
+      <section className="fade-in" style={{ width: '100%' }}>
+        <h2
+          style={{
+            fontSize: '2rem',
+            marginBottom: '2rem',
+            color: '#F9FAFB',
+          }}
+        >
+          Top Trending Markets
+        </h2>
         <div
           style={{
             display: 'grid',
@@ -161,16 +174,21 @@ export default function HomePage() {
             <div
               key={m.title}
               style={{
-                border: '1px solid var(--card-border)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '1.5rem',
-                background: 'rgba(255,255,255,0.03)',
+                background: 'var(--surface)',
               }}
             >
-              <h4 style={{ marginBottom: '0.5rem' }}>{m.title}</h4>
-              <p>
-                <strong>{m.prob}</strong>{' '}
-                <span style={{ color: m.change.startsWith('+') ? '#00ffa0' : '#ff4d4d' }}>
+              <h4 style={{ marginBottom: '0.5rem', color: '#F9FAFB' }}>{m.title}</h4>
+              <p style={{ color: 'var(--text-muted)' }}>
+                <strong style={{ color: '#F9FAFB' }}>{m.prob}</strong>{' '}
+                <span
+                  style={{
+                    color: m.change.startsWith('+') ? '#00FFA0' : '#FF4D4D',
+                    fontWeight: 500,
+                  }}
+                >
                   {m.change}
                 </span>
               </p>
@@ -180,20 +198,33 @@ export default function HomePage() {
       </section>
 
       {/* ================= NEWSLETTER CTA ================= */}
-      <section style={{ width: '100%' }}>
+      <section className="fade-in" style={{ width: '100%' }}>
         <div
           style={{
-            border: '1px solid var(--card-border)',
+            border: '1px solid var(--border)',
             borderRadius: '16px',
             padding: '3rem 2rem',
             textAlign: 'center',
-            background: 'rgba(255,255,255,0.03)',
+            background: 'var(--surface)',
           }}
         >
-          <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+          <h2
+            style={{
+              fontSize: '2rem',
+              marginBottom: '1rem',
+              color: '#F9FAFB',
+            }}
+          >
             Join thousands staying ahead of the world’s expectations.
           </h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              marginBottom: '2rem',
+              maxWidth: '600px',
+              marginInline: 'auto',
+            }}
+          >
             Subscribe to The Edge and Odds On for prediction-market insights and trends.
           </p>
           <div
@@ -210,28 +241,16 @@ export default function HomePage() {
               style={{
                 padding: '0.75rem 1rem',
                 borderRadius: '8px',
-                border: '1px solid var(--card-border)',
+                border: '1px solid var(--border)',
                 minWidth: '250px',
-                background: 'rgba(0,0,0,0.3)',
+                background: '#0D0D0D',
                 color: 'var(--text)',
               }}
             />
-            <button
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '8px',
-                background: 'var(--accent)',
-                color: 'white',
-                fontWeight: 600,
-                border: 'none',
-              }}
-            >
-              Subscribe
-            </button>
+            <button className="button-accent">Subscribe</button>
           </div>
         </div>
       </section>
     </main>
   );
 }
-

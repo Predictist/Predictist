@@ -268,3 +268,48 @@ header, footer {
   50%  { stroke-dashoffset: -220; }
   100% { stroke-dashoffset: 0; }
 }
+:root {
+  --bg: #0A0A0A;
+  --surface: #111111;
+  --border: #1A1A1A;
+  --text: #F9FAFB;
+  --text-muted: #A1A1AA;
+  --accent: #0A84FF;
+}
+
+/* Buttons */
+.button-accent {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
+  transition: opacity 0.2s;
+  border: none;
+  text-decoration: none;
+  display: inline-block;
+}
+.button-accent:hover { opacity: 0.85; }
+
+.button-secondary {
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  text-decoration: none;
+  display: inline-block;
+}
+.button-secondary:hover { border-color: var(--accent); }
+
+/* Fade-in animation */
+.fade-in {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeUp 0.6s ease forwards;
+}
+@keyframes fadeUp {
+  to { opacity: 1; transform: none; }
+}
+
