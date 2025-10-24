@@ -1,11 +1,11 @@
-// pages/predictle/free.js
+// app/predictle/free.js
 import { useState, useEffect } from "react";
 import {
   classNames,
   shuffle,
   spawnConfetti,
   showToast,
-} from "../../lib/utils";
+} from "@/lib/utils";
 
 /* -------------------------------------------------------
    Helper: Normalize and clean market data

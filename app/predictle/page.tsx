@@ -1,4 +1,4 @@
-// pages/predictle/index.js
+// app/predictle/index.js
 import Link from "next/link";
 
 export default function PredictleHome() {

@@ -1,4 +1,4 @@
-// pages/predictle/daily.js
+// app/predictle/daily.js
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
   utcYYYYMMDD,
@@ -7,7 +7,7 @@ import {
   spawnConfetti,
   showToast,
   shuffle,
-} from "../../lib/utils";
+} from "@/lib/utils";
 
 // ---------- Helper: Normalize market data ----------
 function getOutcomes(market) {
