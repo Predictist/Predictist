@@ -261,6 +261,58 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      {/* ================= LEARN SECTION ================= */}
+<section className="fade-in" style={{ width: '100%' }}>
+  <div
+    style={{
+      border: '1px solid var(--border)',
+      borderRadius: '16px',
+      padding: '3rem 2rem',
+      textAlign: 'center',
+      background: 'var(--surface)',
+    }}
+  >
+    <h2
+      style={{
+        fontSize: '2rem',
+        marginBottom: '1rem',
+        color: '#F9FAFB',
+      }}
+    >
+      Learn & Explore Prediction Markets
+    </h2>
+    <p
+      style={{
+        color: 'var(--text-muted)',
+        marginBottom: '2rem',
+        maxWidth: '600px',
+        marginInline: 'auto',
+        lineHeight: 1.6,
+      }}
+    >
+      Dive into interactive guides and real-world examples to understand how prediction markets reflect global expectations. 
+      <br />
+      Start with Predictle — our gamified way to learn by playing.
+    </p>
+
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '1rem',
+        flexWrap: 'wrap',
+      }}
+    >
+      <Link href="/predictle" className="button-accent">
+        Try Predictle
+      </Link>
+      <Link href="/learn" className="button-secondary">
+        Explore Guides
+      </Link>
+    </div>
+  </div>
+</section>
+
     </main>
   );
 }
