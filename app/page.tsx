@@ -23,7 +23,14 @@ export default function HomePage() {
       }}
     >
       {/* ================= HERO ================= */}
-<section className="fade-in">
+<section
+  className="fade-in"
+  style={{
+    background: 'radial-gradient(circle at center, #111 0%, #0A0A0A 60%)',
+    borderRadius: '20px',
+    padding: '6rem 2rem',
+  }}
+>
   <h1
     style={{
       fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
