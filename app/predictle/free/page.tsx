@@ -1,4 +1,6 @@
-// app/predictle/free.js
+// app/predictle/free.tsx
+"use client";
+
 import { useState, useEffect } from "react";
 import {
   classNames,
@@ -10,13 +12,13 @@ import {
 /* -------------------------------------------------------
    Helper: Normalize and clean market data
 ------------------------------------------------------- */
-function getOutcomes(market) {
+function getOutcomes(market: any) {
   const outcomes = Array.isArray(market.outcomes)
     ? market.outcomes
     : market.tokens || [];
 
   return outcomes
-    .map((o) => {
+    .map((o: any) => {
       const name = o.name || o.outcome || o.ticker || "Option";
       const p =
         typeof o.price === "number"
@@ -28,10 +30,10 @@ function getOutcomes(market) {
           : undefined;
       return { name, price: typeof p === "number" ? p : undefined, raw: o };
     })
-    .filter((o) => typeof o.price === "number" && o.price > 0 && o.price < 1);
+    .filter((o: any) => typeof o.price === "number" && o.price > 0 && o.price < 1);
 }
 
-function cleanQuestion(qRaw) {
+function cleanQuestion(qRaw: string) {
   return (qRaw || "")
     .replace(/^arch/i, "")
     .replace(/^[^A-Za-z0-9]+/, "")
@@ -42,7 +44,7 @@ function cleanQuestion(qRaw) {
 /* -------------------------------------------------------
    UI Primitives
 ------------------------------------------------------- */
-function Card({ dark, children }) {
+function Card({ dark, children }: { dark: boolean; children: React.ReactNode }) {
   return (
     <div
       className={classNames(
@@ -55,7 +57,17 @@ function Card({ dark, children }) {
   );
 }
 
-function Button({ children, onClick, disabled, variant = "solid" }) {
+function Button({
+  children,
+  onClick,
+  disabled,
+  variant = "solid",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: "solid" | "ghost";
+}) {
   const cls =
     variant === "ghost"
       ? "text-gray-500 underline hover:text-gray-700"
@@ -71,7 +83,15 @@ function Button({ children, onClick, disabled, variant = "solid" }) {
   );
 }
 
-function Stat({ label, value, color = "blue" }) {
+function Stat({
+  label,
+  value,
+  color = "blue",
+}: {
+  label: string;
+  value: string | number;
+  color?: "blue" | "green";
+}) {
   const text = color === "green" ? "text-green-500" : "text-blue-500";
   return (
     <div className="rounded-lg px-5 py-3 text-center border">
@@ -81,7 +101,7 @@ function Stat({ label, value, color = "blue" }) {
   );
 }
 
-function ComparisonBar({ guess, actual }) {
+function ComparisonBar({ guess, actual }: { guess: number; actual: number }) {
   const g = Math.max(0, Math.min(100, guess));
   const a = Math.max(0, Math.min(100, actual));
   const diff = Math.abs(g - a);
@@ -124,15 +144,20 @@ function ComparisonBar({ guess, actual }) {
    Free Play Component
 ------------------------------------------------------- */
 export default function FreePlay() {
-  const [dark, setDark] = useState(false);
-  const [markets, setMarkets] = useState([]);
-  const [idx, setIdx] = useState(0);
-  const [guess, setGuess] = useState(50);
-  const [feedback, setFeedback] = useState(null);
-  const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState("");
+  // ✅ Updated useState declarations
+  const [dark, setDark] = useState<boolean>(false);
+  const [markets, setMarkets] = useState<any[]>([]);
+  const [idx, setIdx] = useState<number>(0);
+  const [guess, setGuess] = useState<number>(50);
+  const [feedback, setFeedback] = useState<{
+    zone: string;
+    guess: number;
+    actual: number;
+  } | null>(null);
+  const [score, setScore] = useState<number>(0);
+  const [streak, setStreak] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string>("");
 
   // Load theme
   useEffect(() => {
@@ -150,7 +175,7 @@ export default function FreePlay() {
         const data = await res.json();
 
         const filtered = data
-          .map((raw) => {
+          .map((raw: any) => {
             const marketObj =
               Array.isArray(raw.markets) && raw.markets.length > 0
                 ? raw.markets[0]
@@ -166,7 +191,7 @@ export default function FreePlay() {
             return { ...raw, question: q, outcomes };
           })
           .filter(
-            (m) =>
+            (m: any) =>
               m.outcomes?.length === 2 &&
               !m.resolved &&
               !m.closed &&
@@ -177,7 +202,7 @@ export default function FreePlay() {
 
         if (mounted) {
           const deduped = Array.from(
-            new Map(filtered.map((m) => [m.question, m])).values()
+            new Map(filtered.map((m: any) => [m.question, m])).values()
           );
           const shuffled = shuffle(deduped);
           setMarkets(shuffled);
@@ -205,7 +230,7 @@ export default function FreePlay() {
 
   // Helpers
   const current = markets[idx];
-  const judge = (guessPct, actualPct) => {
+  const judge = (guessPct: number, actualPct: number) => {
     const diff = Math.abs(guessPct - actualPct);
     if (diff <= 10) return "green";
     if (diff <= 20) return "yellow";
@@ -249,13 +274,12 @@ export default function FreePlay() {
 
     if (!markets.length) return;
 
-    // advance to next unique market (skip invalid)
     let nextIdx = (idx + 1) % markets.length;
     let tries = 0;
     while (
       tries < markets.length &&
       (!markets[nextIdx]?.outcomes?.length ||
-        markets[nextIdx]?.outcomes?.some((o) => o.price <= 0))
+        markets[nextIdx]?.outcomes?.some((o: any) => o.price <= 0))
     ) {
       nextIdx = (nextIdx + 1) % markets.length;
       tries++;
@@ -263,7 +287,7 @@ export default function FreePlay() {
     setIdx(nextIdx);
   };
 
-  // Render states
+  // Render states (unchanged)
   if (loading)
     return (
       <Card dark={dark}>
@@ -296,7 +320,9 @@ export default function FreePlay() {
       )}
     >
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-6">🎮 Predictle Free Play</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6">
+          🎮 Predictle Free Play
+        </h1>
 
         <Card dark={dark}>
           <div className="flex items-center justify-between mb-3">
@@ -307,7 +333,9 @@ export default function FreePlay() {
             </div>
           </div>
 
-          <p className="text-gray-500 mb-4">{current?.question || "Loading…"}</p>
+          <p className="text-gray-500 mb-4">
+            {current?.question || "Loading…"}
+          </p>
 
           <div className="flex justify-between text-sm text-gray-400 mb-2">
             <span>{left?.name || "Outcome A"}</span>
@@ -326,7 +354,10 @@ export default function FreePlay() {
 
           {feedback ? (
             <>
-              <ComparisonBar guess={feedback.guess} actual={feedback.actual} />
+              <ComparisonBar
+                guess={feedback.guess}
+                actual={feedback.actual}
+              />
               <p className="mt-4 text-lg font-semibold text-center">
                 {feedback.zone === "green"
                   ? "✅ Perfect!"

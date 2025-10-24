@@ -120,17 +120,22 @@ function ComparisonBar({ guess, actual }) {
 // ---------- Main Daily Challenge ----------
 export default function DailyChallenge() {
   const TODAY = utcYYYYMMDD();
-  const [dark, setDark] = useState(false);
-  const [markets, setMarkets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState("");
-  const [step, setStep] = useState(0);
-  const [grid, setGrid] = useState([]);
-  const [feedback, setFeedback] = useState(null);
-  const [guess, setGuess] = useState(50);
-  const [dailyScore, setDailyScore] = useState(0);
-  const [dailyStreak, setDailyStreak] = useState(0);
-  const [locked, setLocked] = useState(false);
+const [dark, setDark] = useState<boolean>(false);
+const [markets, setMarkets] = useState<any[]>([]);
+const [loading, setLoading] = useState<boolean>(true);
+const [fetchError, setFetchError] = useState<string>("");
+const [step, setStep] = useState<number>(0);
+const [grid, setGrid] = useState<string[]>([]);
+const [feedback, setFeedback] = useState<{
+  zone: string;
+  guess: number;
+  actual: number;
+} | null>(null);
+const [guess, setGuess] = useState<number>(50);
+const [dailyScore, setDailyScore] = useState<number>(0);
+const [dailyStreak, setDailyStreak] = useState<number>(0);
+const [locked, setLocked] = useState<boolean>(false);
+
 
   const lastDayRef = useRef(TODAY);
 
