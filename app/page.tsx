@@ -23,47 +23,50 @@ export default function HomePage() {
       }}
     >
       {/* ================= HERO ================= */}
-      <section className="fade-in">
-        <div style={{ marginBottom: '2rem' }}>
-          <SignalWave animated size={80} strokeWidth={4} />
-        </div>
-        <h1
-          style={{
-            fontSize: 'clamp(2rem, 5vw, 3.5rem)',
-            fontWeight: 700,
-            marginBottom: '1rem',
-            color: '#F9FAFB',
-          }}
-        >
-          See what the world believes will happen.
-        </h1>
-        <p
-          style={{
-            color: 'var(--text-muted)',
-            fontSize: '1.2rem',
-            marginBottom: '2rem',
-            maxWidth: '700px',
-            marginInline: 'auto',
-          }}
-        >
-          Predictist combines data, dashboards, and games to track global expectations in real time.
-        </p>
-        <div
-  style={{
-    display: 'flex',
-    gap: '1rem',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  }}
->
-  <Link href="/subscribe" className="button-accent">
-    Subscribe
-  </Link>
-  <Link href="/dashboard" className="button-secondary">
-    Explore Dashboard
-  </Link>
-</div>
-      </section>
+<section className="fade-in">
+  <h1
+    style={{
+      fontSize: 'clamp(2.4rem, 5vw, 3.8rem)',
+      fontWeight: 700,
+      marginBottom: '1rem',
+      color: '#F9FAFB',
+      letterSpacing: '-0.02em',
+      lineHeight: 1.2,
+    }}
+  >
+    See what the world believes will happen.
+  </h1>
+
+  <p
+    style={{
+      color: 'var(--text-muted)',
+      fontSize: '1.15rem',
+      marginBottom: '2.5rem',
+      maxWidth: '650px',
+      marginInline: 'auto',
+      lineHeight: 1.6,
+    }}
+  >
+    Predictist tracks the world’s expectations — from prediction markets to public sentiment — turning data into insight and foresight.
+  </p>
+
+  <div
+    style={{
+      display: 'flex',
+      gap: '1rem',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+    }}
+  >
+    <Link href="/subscribe" className="button-accent">
+      Subscribe
+    </Link>
+    <Link href="/dashboard" className="button-secondary">
+      Explore Dashboard
+    </Link>
+  </div>
+</section>
+
 
       {/* ================= FEATURES ================= */}
       <section className="fade-in" style={{ width: '100%' }}>

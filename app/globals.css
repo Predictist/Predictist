@@ -277,19 +277,21 @@ header, footer {
   --accent: #0A84FF;
 }
 
-/* Buttons */
 .button-accent {
-  background: var(--accent);
-  color: #fff;
+  background: #F9FAFB; /* clean white */
+  color: #0A0A0A;      /* dark neutral text */
   font-weight: 600;
   border-radius: 6px;
   padding: 0.75rem 1.5rem;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
   border: none;
   text-decoration: none;
   display: inline-block;
 }
-.button-accent:hover { opacity: 0.85; }
+.button-accent:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
 
 .button-secondary {
   border: 1px solid var(--border);
@@ -301,15 +303,7 @@ header, footer {
   text-decoration: none;
   display: inline-block;
 }
-.button-secondary:hover { border-color: var(--accent); }
-
-/* Fade-in animation */
-.fade-in {
-  opacity: 0;
-  transform: translateY(8px);
-  animation: fadeUp 0.6s ease forwards;
+.button-secondary:hover {
+  border-color: var(--accent);
+  color: #F9FAFB;
 }
-@keyframes fadeUp {
-  to { opacity: 1; transform: none; }
-}
-
