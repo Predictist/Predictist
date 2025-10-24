@@ -49,20 +49,20 @@ export default function HomePage() {
           Predictist combines data, dashboards, and games to track global expectations in real time.
         </p>
         <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            justifyContent: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
-          <Link href="/predictle" className="button-accent">
-            🎮 Play Predictle
-          </Link>
-          <Link href="/dashboard" className="button-secondary">
-            📊 Explore Dashboard
-          </Link>
-        </div>
+  style={{
+    display: 'flex',
+    gap: '1rem',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  }}
+>
+  <Link href="/subscribe" className="button-accent">
+    Subscribe
+  </Link>
+  <Link href="/dashboard" className="button-secondary">
+    Explore Dashboard
+  </Link>
+</div>
       </section>
 
       {/* ================= FEATURES ================= */}

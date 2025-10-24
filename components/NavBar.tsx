@@ -6,8 +6,10 @@ import { useEffect, useState } from 'react';
 import SignalWave from '@/components/SignalWave';
 
 const links = [
+  { href: '/', label: 'Home' },
   { href: '/predictle', label: 'Predictle' },
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/subscribe', label: 'Subscribe' },
 ];
 
 export default function NavBar() {
@@ -66,8 +68,15 @@ export default function NavBar() {
           </span>
         </Link>
 
-        {/* Center: Links */}
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+        {/* Center: Nav links */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '2rem',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           {links.map((link) => (
             <Link
               key={link.href}
@@ -84,7 +93,7 @@ export default function NavBar() {
           ))}
         </div>
 
-        {/* Right: Auth actions */}
+        {/* Right: Auth buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link
             href="#"
@@ -116,3 +125,4 @@ export default function NavBar() {
     </header>
   );
 }
+
