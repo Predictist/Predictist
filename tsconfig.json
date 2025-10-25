@@ -30,7 +30,7 @@
         "app/components/*"
       ],
       "@/lib/*": [
-        "app/lib/*"
+        "lib/*"
       ]
     },
     "plugins": [

@@ -1,4 +1,4 @@
-import { getTopMarkets } from '@/app/lib/markets';
+import { getTopMarkets } from '@/lib/markets';
 import MarketCard from '@/app/components/MarketCard';
 
 export const revalidate = 30; // when using real APIs, keep it fresh

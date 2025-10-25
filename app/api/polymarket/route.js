@@ -1,6 +1,6 @@
 // app/api/polymarket/route.js
 import { NextResponse } from 'next/server';
-import { fetchPolymarketMarkets } from '@/app/lib/polymarket';
+import { fetchPolymarketMarkets } from '@/lib/polymarket';
 
 
 export async function GET() {

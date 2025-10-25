@@ -10,7 +10,7 @@ import {
   spawnConfetti,
   showToast,
   shuffle,
-} from "../../lib/utils";
+} from "../../../lib/utils";
 
 // ✅ Local Predictle Components
 import Feedback from "../components/Feedback";
