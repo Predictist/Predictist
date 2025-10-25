@@ -11,7 +11,7 @@ export default function NewsletterCTA(){
     e.preventDefault();
     try{
       setStatus('loading');
-      const r = await fetch('/api/subscribe', {
+      const r = await fetch('/app/subscribe', {
         method: 'POST',
         body: JSON.stringify({ email, list }),
       });

@@ -59,7 +59,7 @@ function SubForm({ list }: { list: 'odds'|'edge' }){
     e.preventDefault();
     setStatus('loading');
     try{
-      const r = await fetch('/api/subscribe', { method:'POST', body: JSON.stringify({ email, list }) });
+      const r = await fetch('/app/subscribe', { method:'POST', body: JSON.stringify({ email, list }) });
       if(!r.ok) throw new Error('bad');
       setStatus('ok'); setEmail('');
     }catch(_){ setStatus('err'); }
