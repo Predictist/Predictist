@@ -1,13 +1,25 @@
-// app/predictle/free.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+
+// ✅ Utilities
 import {
+  utcYYYYMMDD,
   classNames,
-  shuffle,
+  pickDailyIndices,
   spawnConfetti,
   showToast,
-} from "@/lib/utils";
+  shuffle,
+} from "../../lib/utils";
+
+// ✅ Local Predictle Components
+import Feedback from "../components/Feedback";
+import GameCard from "../components/GameCard";
+import ScoreDisplay from "../components/ScoreDisplay";
+
+// ✅ (Optional) Shared layout if needed
+// import Layout from "../layout";
+
 
 /* -------------------------------------------------------
    Helper: Normalize and clean market data
@@ -60,7 +72,7 @@ function Card({ dark, children }: { dark: boolean; children: React.ReactNode }) 
 function Button({
   children,
   onClick,
-  disabled,
+  disabled = false,
   variant = "solid",
 }: {
   children: React.ReactNode;

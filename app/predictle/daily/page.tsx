@@ -1,5 +1,8 @@
-// app/predictle/daily.js
+"use client";
+
 import { useState, useEffect, useMemo, useRef } from "react";
+
+// ✅ Utilities
 import {
   utcYYYYMMDD,
   classNames,
@@ -9,14 +12,21 @@ import {
   shuffle,
 } from "@/lib/utils";
 
-// ---------- Helper: Normalize market data ----------
-function getOutcomes(market) {
+// ✅ Local Predictle Components
+import Feedback from "@/components/Feedback";
+import GameCard from "@/components/GameCard";
+import ScoreDisplay from "@/components/ScoreDisplay";
+
+/* -------------------------------------------------------
+   Helper: Normalize and clean market data
+------------------------------------------------------- */
+function getOutcomes(market: any) {
   const outcomes = Array.isArray(market.outcomes)
     ? market.outcomes
     : market.tokens || [];
 
   return outcomes
-    .map((o) => {
+    .map((o: any) => {
       const name = o.name || o.outcome || o.ticker || "Option";
       const p =
         typeof o.price === "number"
@@ -28,10 +38,10 @@ function getOutcomes(market) {
           : undefined;
       return { name, price: typeof p === "number" ? p : undefined, raw: o };
     })
-    .filter((o) => typeof o.price === "number" && o.price > 0 && o.price < 1);
+    .filter((o: any) => typeof o.price === "number" && o.price > 0 && o.price < 1);
 }
 
-function cleanQuestion(qRaw) {
+function cleanQuestion(qRaw: string) {
   return (qRaw || "")
     .replace(/^arch/i, "")
     .replace(/^[^A-Za-z0-9]+/, "")
@@ -39,8 +49,10 @@ function cleanQuestion(qRaw) {
     .trim();
 }
 
-// ---------- UI Primitives ----------
-function Card({ dark, children }) {
+/* -------------------------------------------------------
+   UI Components
+------------------------------------------------------- */
+function Card({ dark, children }: { dark: boolean; children: React.ReactNode }) {
   return (
     <div
       className={classNames(
@@ -53,11 +65,22 @@ function Card({ dark, children }) {
   );
 }
 
-function Button({ children, onClick, disabled, variant = "solid" }) {
+function Button({
+  children,
+  onClick,
+  disabled = false,
+  variant = "solid",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: "solid" | "ghost";
+}) {
   const cls =
     variant === "ghost"
       ? "text-gray-500 underline hover:text-gray-700"
       : "bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg transition";
+
   return (
     <button
       onClick={onClick}
@@ -69,7 +92,15 @@ function Button({ children, onClick, disabled, variant = "solid" }) {
   );
 }
 
-function Stat({ label, value, color = "blue" }) {
+function Stat({
+  label,
+  value,
+  color = "blue",
+}: {
+  label: string;
+  value: string | number;
+  color?: "blue" | "green";
+}) {
   const text = color === "green" ? "text-green-500" : "text-blue-500";
   return (
     <div className="rounded-lg px-5 py-3 text-center border">
@@ -79,13 +110,14 @@ function Stat({ label, value, color = "blue" }) {
   );
 }
 
-function ComparisonBar({ guess, actual }) {
+function ComparisonBar({ guess, actual }: { guess: number; actual: number }) {
   const g = Math.max(0, Math.min(100, guess));
   const a = Math.max(0, Math.min(100, actual));
   const diff = Math.abs(g - a);
   let color = "#ef4444";
   if (diff <= 10) color = "#22c55e";
   else if (diff <= 20) color = "#eab308";
+
   return (
     <div className="mt-5">
       <div className="relative h-3 rounded-full bg-gray-300 dark:bg-gray-700 overflow-hidden">
@@ -117,35 +149,29 @@ function ComparisonBar({ guess, actual }) {
   );
 }
 
-// ---------- Main Daily Challenge ----------
+/* -------------------------------------------------------
+   Main Component
+------------------------------------------------------- */
 export default function DailyChallenge() {
   const TODAY = utcYYYYMMDD();
-const [dark, setDark] = useState<boolean>(false);
-const [markets, setMarkets] = useState<any[]>([]);
-const [loading, setLoading] = useState<boolean>(true);
-const [fetchError, setFetchError] = useState<string>("");
-const [step, setStep] = useState<number>(0);
-const [grid, setGrid] = useState<string[]>([]);
-const [feedback, setFeedback] = useState<{
-  zone: string;
-  guess: number;
-  actual: number;
-} | null>(null);
-const [guess, setGuess] = useState<number>(50);
-const [dailyScore, setDailyScore] = useState<number>(0);
-const [dailyStreak, setDailyStreak] = useState<number>(0);
-const [locked, setLocked] = useState<boolean>(false);
-
-
+  const [dark, setDark] = useState(false);
+  const [markets, setMarkets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
+  const [step, setStep] = useState(0);
+  const [grid, setGrid] = useState<string[]>([]);
+  const [feedback, setFeedback] = useState<{ zone: string; guess: number; actual: number } | null>(null);
+  const [guess, setGuess] = useState(50);
+  const [dailyScore, setDailyScore] = useState(0);
+  const [dailyStreak, setDailyStreak] = useState(0);
+  const [locked, setLocked] = useState(false);
   const lastDayRef = useRef(TODAY);
 
-  // Theme load
   useEffect(() => {
     const saved = localStorage.getItem("predictle_theme");
     if (saved === "dark") setDark(true);
   }, []);
 
-  // Fetch Polymarket data
   useEffect(() => {
     let mounted = true;
     const fetchMarkets = async () => {
@@ -155,35 +181,23 @@ const [locked, setLocked] = useState<boolean>(false);
         const data = await res.json();
 
         const filtered = data
-          .map((raw) => {
-            const marketObj =
-              Array.isArray(raw.markets) && raw.markets.length > 0
-                ? raw.markets[0]
-                : raw;
-            const qRaw =
-              raw.question ||
-              raw.title ||
-              marketObj.question ||
-              marketObj.title ||
-              "";
+          .map((raw: any) => {
+            const marketObj = Array.isArray(raw.markets) && raw.markets.length > 0 ? raw.markets[0] : raw;
+            const qRaw = raw.question || raw.title || marketObj.question || marketObj.title || "";
             const q = cleanQuestion(qRaw);
             const outcomes = getOutcomes(marketObj);
             return { ...raw, question: q, outcomes };
           })
           .filter(
-            (m) =>
+            (m: any) =>
               m.outcomes?.length === 2 &&
               !m.resolved &&
               !m.closed &&
-              !/test|archive|2018|2019|2020|2021|2022|2023/i.test(
-                m.question || ""
-              )
+              !/test|archive|2018|2019|2020|2021|2022|2023/i.test(m.question || "")
           );
 
         if (mounted) {
-          const deduped = Array.from(
-            new Map(filtered.map((m) => [m.question, m])).values()
-          );
+          const deduped = Array.from(new Map(filtered.map((m: any) => [m.question, m])).values());
           const shuffled = shuffle(deduped);
           setMarkets(shuffled);
         }
@@ -200,7 +214,6 @@ const [locked, setLocked] = useState<boolean>(false);
     };
   }, []);
 
-  // UTC midnight reset
   useEffect(() => {
     const id = setInterval(() => {
       const nowDay = utcYYYYMMDD();
@@ -220,7 +233,6 @@ const [locked, setLocked] = useState<boolean>(false);
     return () => clearInterval(id);
   }, []);
 
-  // Restore from localStorage
   useEffect(() => {
     const lastPlay = localStorage.getItem("predictle_daily_last");
     if (lastPlay === TODAY) {
@@ -228,12 +240,8 @@ const [locked, setLocked] = useState<boolean>(false);
       setGrid(JSON.parse(localStorage.getItem("predictle_daily_grid") || "[]"));
       setStep(parseInt(localStorage.getItem("predictle_daily_step") || "5"));
     }
-    setDailyScore(
-      parseFloat(localStorage.getItem("predictle_daily_score") || "0")
-    );
-    setDailyStreak(
-      parseInt(localStorage.getItem("predictle_daily_streak") || "0", 10)
-    );
+    setDailyScore(parseFloat(localStorage.getItem("predictle_daily_score") || "0"));
+    setDailyStreak(parseInt(localStorage.getItem("predictle_daily_streak") || "0", 10));
   }, [TODAY]);
 
   const todaysFive = useMemo(() => {
@@ -243,9 +251,7 @@ const [locked, setLocked] = useState<boolean>(false);
   }, [markets, TODAY]);
 
   const current = todaysFive[step];
-
-  // ---------- Gameplay ----------
-  const judge = (guessPct, actualPct) => {
+  const judge = (guessPct: number, actualPct: number) => {
     const diff = Math.abs(guessPct - actualPct);
     if (diff <= 10) return "green";
     if (diff <= 20) return "yellow";
@@ -260,7 +266,6 @@ const [locked, setLocked] = useState<boolean>(false);
 
     let newScore = dailyScore;
     let newStreak = dailyStreak;
-
     if (zone === "green") {
       newScore += 1;
       newStreak += 1;
@@ -300,13 +305,10 @@ const [locked, setLocked] = useState<boolean>(false);
     const text = `📊 Predictle — ${TODAY}\n${grid.join("")}\nScore: ${dailyScore.toFixed(
       1
     )} | Streak: ${dailyStreak}\nPlay: https://predictist.io/predictle/daily`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-      text
-    )}`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   };
 
-  // ---------- Render ----------
   if (loading)
     return (
       <Card dark={dark}>
@@ -354,15 +356,11 @@ const [locked, setLocked] = useState<boolean>(false);
       )}
     >
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-6">
-          🗓️ Predictle Daily Challenge
-        </h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6">🗓️ Predictle Daily Challenge</h1>
 
         <Card dark={dark}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">
-              Question {Math.min(step + 1, 5)} / 5
-            </h2>
+            <h2 className="text-lg font-semibold">Question {Math.min(step + 1, 5)} / 5</h2>
             <div className="flex gap-4">
               <Stat label="Score" value={dailyScore.toFixed(1)} color="blue" />
               <Stat label="Streak" value={dailyStreak} color="green" />

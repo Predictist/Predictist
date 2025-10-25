@@ -1,12 +1,15 @@
 // app/api/polymarket/route.js
 import { NextResponse } from 'next/server';
-import { fetchPolymarketMarkets } from '@/lib/polymarket';
+import { fetchPolymarketMarkets } from '@/app/lib/polymarket';
+
 
 export async function GET() {
   try {
     console.log('🌐 Fetching fresh Polymarket data…');
 
+
     const markets = await fetchPolymarketMarkets();
+
 
     console.log(`✅ Fetched ${markets.length} markets`);
     const playable = markets.filter(
@@ -18,7 +21,9 @@ export async function GET() {
         m.outcomePrices[0] !== null
     );
 
+
     console.log(`🎯 normalizeMarkets → ${playable.length} playable`);
+
 
     return NextResponse.json(
       {

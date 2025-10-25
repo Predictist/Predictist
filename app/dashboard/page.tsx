@@ -1,4 +1,4 @@
-import { getTopMarkets } from '@/lib/markets';
+import { getTopMarkets } from '@/app/predictle/lib/markets';
 import MarketCard from '@/components/MarketCard';
 
 export const revalidate = 30; // when using real APIs, keep it fresh
