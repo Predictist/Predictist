@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import SignalWave from '@/components/SignalWave';
+import SignalWave from '@/app/components/SignalWave';
 
 const links = [
   { href: '/', label: 'Home' },
