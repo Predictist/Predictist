@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import SignalWave from '@/app/components/SignalWave';
+import SignalWave from '@components/SignalWave';
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
