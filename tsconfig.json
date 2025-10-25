@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "target": "ESNext",
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -18,26 +14,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",
-     "paths": {                         // ✅ Add this section
+    "baseUrl": ".",                     
+    "paths": {                          
       "@/*": ["app/*"],
-      "@/lib/*": ["app/lib/*"],
-      "@/components/*": ["app/predictle/components/*"]
-    },
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "strictNullChecks": true
+      "@components/*": ["app/components/*"],
+      "@/components/*": ["app/components/*"],
+      "@/lib/*": ["app/lib/*"]
+    }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "next-env.d.ts",
-    ".next/types/**/*.ts"
-, "@/lib/utils.js"  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
 }
