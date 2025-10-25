@@ -13,9 +13,10 @@ import {
 } from "@/lib/utils";
 
 // ✅ Local Predictle Components
-import Feedback from "@/components/Feedback";
-import GameCard from "@/components/GameCard";
-import ScoreDisplay from "@/components/ScoreDisplay";
+import Feedback from "../components/Feedback";
+import GameCard from "../components/GameCard";
+import ScoreDisplay from "../components/ScoreDisplay";
+
 
 /* -------------------------------------------------------
    Helper: Normalize and clean market data
