@@ -100,57 +100,65 @@ export default function DailyChallenge() {
   };
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-6">
-      <h1 className="text-3xl font-bold mb-2">📅 Predictle Daily Challenge</h1>
-      <p className="text-gray-500 mb-6">5 questions per day — come back tomorrow!</p>
+    <main className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+  <h1 className="text-4xl font-bold mb-3 tracking-tight bg-gradient-to-r from-violet-400 to-pink-400 text-transparent bg-clip-text">
+    📅 Predictle Daily Challenge
+  </h1>
+  <p className="text-gray-400 mb-8">5 questions per day — come back tomorrow!</p>
 
-      {locked ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 w-full max-w-lg text-center">
-          <p className="text-lg mb-4">✅ You’ve finished today’s challenge!</p>
-          <p className="mb-2 text-gray-500">Score: {score}/5</p>
-          <p className="mb-4 text-gray-500">Streak: 🔥 {streak}</p>
-          <button
-            onClick={handleShare}
-            className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
-          >
-            Share Results
-          </button>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 w-full max-w-lg text-center">
-          {questions[index] ? (
-            <>
-              <p className="text-lg font-medium mb-6">
-                {questions[index].question}
+  <div className="predictle-card p-8 w-full max-w-2xl">
+    {locked ? (
+      <>
+        <p className="text-lg mb-4 text-green-400">✅ You’ve finished today’s challenge!</p>
+        <p className="text-gray-400 mb-2">Score: {score}/5</p>
+        <p className="text-gray-400 mb-6">Streak: 🔥 {streak}</p>
+        <button
+          onClick={handleShare}
+          className="predictle-btn bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          Share Results
+        </button>
+      </>
+    ) : (
+      <>
+        {questions[index] ? (
+          <>
+            <p className="text-xl font-medium mb-6">{questions[index].question}</p>
+            {!result ? (
+              <div className="flex justify-center gap-6">
+                <button
+                  onClick={() => handleGuess('Yes')}
+                  className="predictle-btn yes text-white"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => handleGuess('No')}
+                  className="predictle-btn no text-white"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <p
+                className={`text-xl font-semibold mt-4 ${
+                  result.includes('Correct') ? 'text-green-400' : 'text-red-400'
+                }`}
+              >
+                {result}
               </p>
-              {!result ? (
-                <div className="flex justify-center gap-4">
-                  <button
-                    onClick={() => handleGuess('Yes')}
-                    className="px-6 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold transition"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => handleGuess('No')}
-                    className="px-6 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition"
-                  >
-                    No
-                  </button>
-                </div>
-              ) : (
-                <p className="text-lg font-semibold mt-2">{result}</p>
-              )}
-              <p className="text-sm text-gray-400 mt-4">
-                Question {index + 1} / 5
-              </p>
-            </>
-          ) : (
-            <p>Loading today’s markets...</p>
-          )}
-        </div>
-      )}
-    </main>
+            )}
+            <p className="text-sm text-gray-500 mt-6">
+              Question {index + 1} / 5
+            </p>
+          </>
+        ) : (
+          <p>Loading today’s questions...</p>
+        )}
+      </>
+    )}
+  </div>
+</main>
   );
 }
 

@@ -55,44 +55,52 @@ export default function FreePlayPage() {
   };
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-6">
-      <h1 className="text-3xl font-bold mb-2">🎯 Predictle: Free Play</h1>
-      <p className="text-gray-500 mb-6">Endless yes/no prediction challenges</p>
+    <main className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+  <h1 className="text-4xl font-bold mb-3 tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 text-transparent bg-clip-text">
+    🎯 Predictle: Free Play
+  </h1>
+  <p className="text-gray-400 mb-8">Endless yes/no prediction challenges</p>
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 w-full max-w-lg text-center">
-        {question ? (
-          <>
-            <p className="text-lg font-medium mb-6">{question.question}</p>
+  <div className="predictle-card p-8 w-full max-w-2xl">
+    {question ? (
+      <>
+        <p className="text-xl font-medium mb-6">{question.question}</p>
 
-            {!answered ? (
-              <div className="flex justify-center gap-4">
-                <button
-                  onClick={() => handleGuess('Yes')}
-                  className="px-6 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold transition"
-                >
-                  Yes
-                </button>
-                <button
-                  onClick={() => handleGuess('No')}
-                  className="px-6 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
-              <p className="text-lg font-semibold mt-2">{result}</p>
-            )}
-          </>
+        {!answered ? (
+          <div className="flex justify-center gap-6">
+            <button
+              onClick={() => handleGuess('Yes')}
+              className="predictle-btn yes text-white"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => handleGuess('No')}
+              className="predictle-btn no text-white"
+            >
+              No
+            </button>
+          </div>
         ) : (
-          <p>Loading question...</p>
+          <p
+            className={`text-xl font-semibold mt-4 ${
+              result?.includes('Correct') ? 'text-green-400' : 'text-red-400'
+            }`}
+          >
+            {result}
+          </p>
         )}
-      </div>
+      </>
+    ) : (
+      <p>Loading question...</p>
+    )}
+  </div>
 
-      <div className="mt-6 text-sm text-gray-400">
-        <p>Total Played: {totalPlayed}</p>
-        <p>Score: {score.toFixed(1)}</p>
-      </div>
-    </main>
+  <div className="mt-8 text-gray-400 text-sm">
+    <p>Questions Answered: {totalPlayed}</p>
+    <p>Score: {score.toFixed(1)}</p>
+  </div>
+</main>
   );
 }
 
