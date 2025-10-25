@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import SignalWave from '@/app/components/SignalWave';
+import SignalWave from '@components/SignalWave';
 
 export default function Footer() {
   return (
