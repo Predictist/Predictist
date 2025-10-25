@@ -307,3 +307,49 @@ header, footer {
   border-color: var(--accent);
   color: #F9FAFB;
 }
+/* Predictle Visual Enhancements */
+
+:root {
+  --predictle-bg: linear-gradient(135deg, #09090b, #111827);
+  --predictle-card: #1f2937;
+  --predictle-accent: #3b82f6;
+  --predictle-correct: #16a34a;
+  --predictle-wrong: #dc2626;
+}
+
+body {
+  background: var(--predictle-bg);
+  color: #f9fafb;
+  font-family: 'Inter', sans-serif;
+}
+
+.predictle-card {
+  background: var(--predictle-card);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  border-radius: 1.5rem;
+  transition: all 0.4s ease;
+}
+
+.predictle-card:hover {
+  transform: scale(1.01);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+}
+
+.predictle-btn {
+  border-radius: 9999px;
+  font-weight: 600;
+  padding: 0.75rem 1.75rem;
+  transition: all 0.25s ease;
+}
+
+.predictle-btn.yes {
+  background: var(--predictle-correct);
+}
+
+.predictle-btn.no {
+  background: var(--predictle-wrong);
+}
+
+.predictle-btn:hover {
+  filter: brightness(1.1);
+}
