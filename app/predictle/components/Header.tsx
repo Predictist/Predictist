@@ -15,6 +15,7 @@ export default function Header() {
 
   return (
     <header className="flex flex-col items-center justify-center py-12 text-white">
+      console.log('Header component loaded');
       <h1 className="text-4xl font-extrabold tracking-wide text-cyan-400 mb-8">
         PREDICTLE
       </h1>
