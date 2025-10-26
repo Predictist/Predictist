@@ -13,8 +13,11 @@ const CLOB_URL = 'https://clob.polymarket.com/markets';
 
 export async function GET() {
   try {
-    const apiKey = process.env.POLYMARKET_API_KEY?.trim();
-    const isAuth = !!apiKey;
+    const rawKey = (process.env.POLYMARKET_API_KEY || '').trim();
+// treat as “auth” only if it looks like a real token (length threshold)
+const apiKey = rawKey.length > 20 ? rawKey : '';
+const isAuth = apiKey !== '';
+
 
     // pick endpoint
     const endpoint = isAuth ? CLOB_URL : GAMMA_URL;

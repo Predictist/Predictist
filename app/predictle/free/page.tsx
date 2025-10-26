@@ -12,65 +12,50 @@ type Question = {
 };
 
 export default function PredictleFree() {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [index, setIndex] = useState(0);
-  const [score, setScore] = useState(0);
+  // Pool + current (unlimited rotation)
+  const [pool, setPool] = useState<Question[]>([]);
+  const [current, setCurrent] = useState<Question | null>(null);
+
+  // Score & flow
+  const [score, setScore] = useState<number>(0);
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState('');
-  const [source, setSource] = useState<string>('Gamma');
+  const [totalPlayed, setTotalPlayed] = useState(0);
+
+  // Live/Demo pill
+  const [source, setSource] = useState<string>('Gamma'); // 'CLOB' | 'Gamma' | 'Demo'
 
   useEffect(() => {
+    const storedScore = parseFloat(localStorage.getItem('predictle_fp_score') || '0');
+    setScore(storedScore);
     fetchMarketsWithFallback();
   }, []);
 
   async function fetchMarketsWithFallback() {
     try {
-      const res = await fetch('/api/polymarket');
-const data = await res.json();
-setSource(data.source || 'Gamma');
+      const res = await fetch('/api/polymarket', { cache: 'no-store' });
+      const data = await res.json();
 
-let live = normalizeLiveMarkets(data.markets);
+      // Normalize live markets
+      let live = normalizeLiveMarkets(data?.markets || []);
 
-// fallback: if no valid markets, use mock data
-if (!live || live.length === 0) {
-  console.warn('No live markets found — using demo questions');
-  live = [
-    {
-      id: 'demo1',
-      question: 'Will the sun rise tomorrow?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-    {
-      id: 'demo2',
-      question: 'Will Bitcoin still exist in 2026?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-    {
-      id: 'demo3',
-      question: 'Will AI models improve next year?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-    {
-      id: 'demo4',
-      question: 'Will humans colonize Mars before 2035?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'No',
-    },
-    {
-      id: 'demo5',
-      question: 'Will the next iPhone cost over $1,000?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-  ];
-}
+      // If nothing usable, switch to demo set and mark source as Demo
+      if (!live || live.length === 0) {
+        console.warn('No live markets — using demo set');
+        setSource('Demo');
+        live = DEMO_SET;
+      } else {
+        // Show CLOB only if explicitly returned; otherwise Gamma
+        setSource(data?.source === 'CLOB' ? 'CLOB' : 'Gamma');
+      }
 
-setQuestions(live.slice(0, 20));
+      setPool(live);
+      setCurrent(live[Math.floor(Math.random() * live.length)]);
     } catch (err) {
-      console.error('Error fetching markets:', err);
+      console.error('Fetch error — using demo set:', err);
+      setSource('Demo');
+      setPool(DEMO_SET);
+      setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
     }
   }
 
@@ -87,7 +72,7 @@ setQuestions(live.slice(0, 20));
 
         if (!outcomesArr) return null;
 
-        const p = typeof m.probability === 'number' ? m.probability : undefined;
+        const p = typeof m.probability === 'number' ? m.probability : undefined; // prob of outcomes[0]
         const correct =
           typeof p === 'number' ? (p >= 0.5 ? outcomesArr[0] : outcomesArr[1]) : outcomesArr[0];
 
@@ -104,22 +89,30 @@ setQuestions(live.slice(0, 20));
       );
   }
 
-  function handleGuess(answer: string) {
-    if (answered) return;
-    const current = questions[index];
-    const isCorrect = answer === current.correctAnswer;
-    setAnswered(true);
-    setResult(isCorrect ? '✅ Correct!' : '❌ Wrong!');
-    if (isCorrect) setScore(score + 1);
-
-    setTimeout(() => {
-      setAnswered(false);
-      setResult('');
-      setIndex((i) => (i + 1) % questions.length);
-    }, 1200);
+  function nextQuestion() {
+    if (!pool.length) return;
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    setCurrent(next);
+    setAnswered(false);
+    setResult('');
   }
 
-  const q = questions[index];
+  function handleGuess(choice: string) {
+    if (!current || answered) return;
+
+    const correct = choice === current.correctAnswer;
+    const newScore = correct ? score + 1 : Math.max(0, score - 0.5);
+
+    setScore(newScore);
+    localStorage.setItem('predictle_fp_score', String(newScore));
+
+    setAnswered(true);
+    setResult(correct ? '✅ Correct!' : `❌ Wrong — favored: ${current.correctAnswer}`);
+    setTotalPlayed((n) => n + 1);
+
+    // rotate automatically after brief pause
+    setTimeout(nextQuestion, 1300);
+  }
 
   return (
     <main className="relative flex flex-col items-center justify-center min-h-screen p-6 text-center text-white">
@@ -130,23 +123,29 @@ setQuestions(live.slice(0, 20));
 
         <AnimatePresence mode="wait">
           <motion.div
-            key={q?.id || index}
+            key={current?.id || totalPlayed}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.4 }}
           >
-            {q ? (
+            {current ? (
               <>
-                <p className="text-xl mb-6">{q.question}</p>
+                <p className="text-xl mb-6">{current.question}</p>
 
                 {!answered ? (
                   <div className="flex justify-center gap-6">
-                    {q.options.map((opt) => (
+                    {current.options.map((opt) => (
                       <button
                         key={opt}
                         onClick={() => handleGuess(opt)}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-medium"
+                        className={`px-6 py-3 rounded-lg text-lg font-medium ${
+                          opt === 'Yes'
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : opt === 'No'
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
                       >
                         {opt}
                       </button>
@@ -158,19 +157,20 @@ setQuestions(live.slice(0, 20));
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.3 }}
                     className={`text-xl font-semibold mt-4 ${
-                      result.includes('Correct') ? 'text-green-400' : 'text-red-400'
+                      result.startsWith('✅') ? 'text-green-400' : 'text-red-400'
                     }`}
                   >
                     {result}
                   </motion.p>
                 )}
 
-                <p className="text-sm text-gray-400 mt-8">
-                  Score: {score} / {questions.length}
-                </p>
+                <div className="mt-8 text-sm text-gray-400">
+                  <p>Questions Answered: {totalPlayed}</p>
+                  <p>Score: {score.toFixed(1)}</p>
+                </div>
               </>
             ) : (
-              <p>Loading questions...</p>
+              <p>Loading questions…</p>
             )}
           </motion.div>
         </AnimatePresence>
@@ -178,5 +178,14 @@ setQuestions(live.slice(0, 20));
     </main>
   );
 }
+
+// Local demo backup used when no live markets
+const DEMO_SET: Question[] = [
+  { id: 'demo1', question: 'Will the sun rise tomorrow?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+  { id: 'demo2', question: 'Will Bitcoin still exist in 2026?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+  { id: 'demo3', question: 'Will AI models improve next year?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+  { id: 'demo4', question: 'Will humans colonize Mars before 2035?', options: ['Yes', 'No'], correctAnswer: 'No' },
+  { id: 'demo5', question: 'Will the next iPhone cost over $1,000?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+];
 
 
