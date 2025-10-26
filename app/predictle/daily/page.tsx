@@ -1,32 +1,78 @@
 'use client';
-import { useState, useEffect } from 'react';
 
-// Temporary mock markets — will be replaced by real Polymarket feed
+import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- Mock fallback (used until your API key is live) ---
 const MOCK_MARKETS = [
-  { id: 1, question: 'Will Bitcoin be above $90,000 by next month?', outcome: 'Yes' },
-  { id: 2, question: 'Will the next iPhone be foldable?', outcome: 'No' },
-  { id: 3, question: 'Will the U.S. win more than 40 medals in the next Olympics?', outcome: 'Yes' },
-  { id: 4, question: 'Will ChatGPT surpass 2 billion users by 2026?', outcome: 'No' },
-  { id: 5, question: 'Will inflation fall below 2% by the end of this year?', outcome: 'Yes' },
-  { id: 6, question: 'Will Ethereum flip Bitcoin by 2027?', outcome: 'No' },
-  { id: 7, question: 'Will Tesla release a flying car before 2030?', outcome: 'No' },
-  { id: 8, question: 'Will AI regulation pass in the U.S. by 2025?', outcome: 'Yes' },
-  { id: 9, question: 'Will space tourism reach 10,000 customers by 2030?', outcome: 'No' },
-  { id: 10, question: 'Will a female U.S. president be elected by 2032?', outcome: 'Yes' },
+  { id: 'd1', question: 'Will Apple ship a foldable iPhone by 2026?', options: ['Yes', 'No'], correctAnswer: 'No' },
+  { id: 'd2', question: 'Will Ethereum trade above $4,000 by June 2025?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+  { id: 'd3', question: 'Will SpaceX land humans on Mars before 2030?', options: ['Yes', 'No'], correctAnswer: 'No' },
+  { id: 'd4', question: 'Will AI regulation pass in the US by 2025?', options: ['Yes', 'No'], correctAnswer: 'No' },
+  { id: 'd5', question: 'Will inflation fall below 2% by year-end?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+  { id: 'd6', question: 'Will the next US President be Republican?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
+  { id: 'd7', question: 'Will TikTok be banned in the US by 2026?', options: ['Yes', 'No'], correctAnswer: 'No' },
+  { id: 'd8', question: 'Will S&P 500 hit 6000 by 2026?', options: ['Yes', 'No'], correctAnswer: 'No' },
 ];
 
+// normalize live markets -> { id, question, options: [a,b], correctAnswer }
+// normalize live markets -> { id, question, options: [a,b], correctAnswer }
+function normalizeLiveMarkets(
+  raw: any[]
+): { id: string; question: string; options: string[]; correctAnswer: string }[] {
+  return (raw || [])
+    .map((m: any) => {
+      const question = m.question || m.title || 'Untitled market';
+      const outcomesArr =
+        (Array.isArray(m.outcomes) && m.outcomes.length === 2 && m.outcomes.map((o: any) => o.name)) ||
+        (Array.isArray(m.tokens) && m.tokens.length === 2 && m.tokens.map((t: any) => t.ticker || t.outcome)) ||
+        null;
+
+      if (!outcomesArr) return null;
+
+      // favor the side with probability >= 0.5 (when present)
+      const p = typeof m.probability === 'number' ? m.probability : undefined;
+      const correct =
+        typeof p === 'number'
+          ? (p >= 0.5 ? outcomesArr[0] : outcomesArr[1])
+          : outcomesArr[0];
+
+      return {
+        id: String(m.id || m.condition_id || question),
+        question,
+        options: outcomesArr,
+        correctAnswer: correct,
+      };
+    })
+    .filter((m): m is { id: string; question: string; options: string[]; correctAnswer: string } => Boolean(m));
+}
+
+async function fetchMarketsWithFallback(): Promise<{ id: string; question: string; options: string[]; correctAnswer: string }[]> {
+  try {
+    const res = await fetch('/api/polymarket', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { markets } = await res.json();
+    const normalized = normalizeLiveMarkets(markets);
+    if (normalized && normalized.length) return normalized;
+  } catch (e) {
+    console.warn('Polymarket fetch failed, using mocks:', e);
+  }
+  return MOCK_MARKETS;
+}
+
+const DAILY_COUNT = 5;
+
 export default function DailyChallenge() {
-  const [questions, setQuestions] = useState<any[]>([]);
+  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [pool, setPool] = useState<any[]>([]);
+  const [five, setFive] = useState<any[]>([]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [locked, setLocked] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [streak, setStreak] = useState(0);
 
-  // Helper: get today’s date string
-  const todayKey = new Date().toISOString().slice(0, 10);
-
-  // Load progress or reset for new day
+  // boot: load markets + restore progress/lock per day
   useEffect(() => {
     const savedDate = localStorage.getItem('predictle_daily_date');
     const savedScore = parseFloat(localStorage.getItem('predictle_daily_score') || '0');
@@ -35,130 +81,151 @@ export default function DailyChallenge() {
     if (savedDate === todayKey) {
       setScore(savedScore);
       setStreak(savedStreak);
-      setLocked(savedScore >= 5);
+      if (savedScore >= DAILY_COUNT) setLocked(true);
     } else {
-      // New day
+      // New day reset (keep streak; we update it at the end of play)
       localStorage.setItem('predictle_daily_date', todayKey);
       localStorage.setItem('predictle_daily_score', '0');
-      setScore(0);
-      setStreak(savedStreak); // keep streak for now
     }
 
-    // Pick 5 unique questions for today
-    const shuffled = [...MOCK_MARKETS].sort(() => 0.5 - Math.random());
-    setQuestions(shuffled.slice(0, 5));
-  }, []);
+    (async () => {
+      const markets = await fetchMarketsWithFallback();
+      setPool(markets);
+      // choose 5 unique markets for today
+      const shuffled = [...markets].sort(() => 0.5 - Math.random());
+      setFive(shuffled.slice(0, DAILY_COUNT));
+    })();
+  }, [todayKey]);
 
-  const handleGuess = (guess: string) => {
-    if (locked || !questions[index]) return;
+  const handleGuess = (choice: string) => {
+    if (locked || !five[index]) return;
 
-    const correct = guess === questions[index].outcome;
+    const correct = choice === five[index].correctAnswer;
     const newScore = score + (correct ? 1 : 0);
+
     setScore(newScore);
-    setResult(correct ? '✅ Correct' : `❌ Wrong — it was ${questions[index].outcome}`);
-    localStorage.setItem('predictle_daily_score', newScore.toString());
+    setResult(correct ? '✅ Correct' : `❌ Wrong — favored: ${five[index].correctAnswer}`);
+    localStorage.setItem('predictle_daily_score', String(newScore));
 
-    // If finished all 5
-    if (index >= 4) {
-      const finished = true;
-      localStorage.setItem('predictle_daily_score', newScore.toString());
-      localStorage.setItem('predictle_daily_date', todayKey);
+    if (index >= DAILY_COUNT - 1) {
+      // finished all 5 — lock for the day
       setLocked(true);
+      localStorage.setItem('predictle_daily_date', todayKey);
 
-      // Update streaks
+      // simple streak rule: keep streak if 3+ correct today; else reset
       if (newScore >= 3) {
-        const newStreak = streak + 1;
-        setStreak(newStreak);
-        localStorage.setItem('predictle_daily_streak', newStreak.toString());
+        const ns = streak + 1;
+        setStreak(ns);
+        localStorage.setItem('predictle_daily_streak', String(ns));
       } else {
         setStreak(0);
         localStorage.setItem('predictle_daily_streak', '0');
       }
 
-      // Show results summary
-      setTimeout(() => {
-        setResult('Daily challenge complete!');
-      }, 2000);
+      // show final banner a moment later
+      setTimeout(() => setResult('Daily challenge complete!'), 1200);
     } else {
-      // Move to next question after 1.5s
       setTimeout(() => {
-        setIndex(index + 1);
+        setIndex((i) => i + 1);
         setResult(null);
-      }, 1500);
+      }, 1200);
     }
   };
 
-  // Wordle-style share summary
-  const handleShare = () => {
-    const squares = Array(score)
-      .fill('🟩')
-      .concat(Array(5 - score).fill('⬜️'))
-      .join('');
-    const shareText = `${squares}\nPredictle Daily #${todayKey}\n${score}/5 correct\npredictist.com/predictle`;
-    navigator.clipboard.writeText(shareText);
-    alert('📋 Results copied! Share it on social!');
+  const handleShare = async () => {
+    const squares = Array(score).fill('🟩').concat(Array(DAILY_COUNT - score).fill('⬜️')).join('');
+    const text = `${squares}\nPredictle Daily #${todayKey}\n${score}/${DAILY_COUNT} correct\npredictist.com/predictle/daily`;
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('📋 Results copied! Share it anywhere.');
+    } catch {
+      // fallback
+      prompt('Copy your results:', text);
+    }
   };
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
-  <h1 className="text-4xl font-bold mb-3 tracking-tight bg-gradient-to-r from-violet-400 to-pink-400 text-transparent bg-clip-text">
-    📅 Predictle Daily Challenge
-  </h1>
-  <p className="text-gray-400 mb-8">5 questions per day — come back tomorrow!</p>
+      <h1 className="text-4xl font-bold mb-3 tracking-tight bg-gradient-to-r from-violet-400 to-pink-400 text-transparent bg-clip-text">
+        📅 Predictle Daily Challenge
+      </h1>
+      <p className="text-gray-400 mb-8">5 questions per day — come back tomorrow!</p>
 
-  <div className="predictle-card p-8 w-full max-w-2xl">
-    {locked ? (
-      <>
-        <p className="text-lg mb-4 text-green-400">✅ You’ve finished today’s challenge!</p>
-        <p className="text-gray-400 mb-2">Score: {score}/5</p>
-        <p className="text-gray-400 mb-6">Streak: 🔥 {streak}</p>
-        <button
-          onClick={handleShare}
-          className="predictle-btn bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Share Results
-        </button>
-      </>
-    ) : (
-      <>
-        {questions[index] ? (
-          <>
-            <p className="text-xl font-medium mb-6">{questions[index].question}</p>
-            {!result ? (
-              <div className="flex justify-center gap-6">
-                <button
-                  onClick={() => handleGuess('Yes')}
-                  className="predictle-btn yes text-white"
-                >
-                  Yes
-                </button>
-                <button
-                  onClick={() => handleGuess('No')}
-                  className="predictle-btn no text-white"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
-              <p
-                className={`text-xl font-semibold mt-4 ${
-                  result.includes('Correct') ? 'text-green-400' : 'text-red-400'
-                }`}
+      <div className="predictle-card p-8 w-full max-w-2xl relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={locked ? 'locked' : five[index]?.id || index}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35 }}
+          >
+            {locked ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
               >
-                {result}
-              </p>
+                <p className="text-lg mb-4 text-green-400">✅ You’ve finished today’s challenge!</p>
+                <p className="text-gray-400 mb-2">Score: {score}/{DAILY_COUNT}</p>
+                <p className="text-gray-400 mb-6">Streak: 🔥 {streak}</p>
+                <button
+                  onClick={handleShare}
+                  className="predictle-btn bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Share Results
+                </button>
+              </motion.div>
+            ) : five[index] ? (
+              <>
+                <p className="text-xl font-medium mb-6">{five[index].question}</p>
+
+                {!result ? (
+                  <div className="flex justify-center gap-6">
+                    {five[index].options.map((opt: string) => (
+                      <button
+                        key={opt}
+                        onClick={() => handleGuess(opt)}
+                        className={`predictle-btn text-white ${opt === 'Yes' ? 'yes' : opt === 'No' ? 'no' : 'bg-blue-600'}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <motion.p
+                    initial={{ scale: 0.92, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.25 }}
+                    className={`text-xl font-semibold mt-4 ${
+                      result.startsWith('✅') ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {result}
+                  </motion.p>
+                )}
+
+                {/* Progress bar */}
+                <div className="w-full h-2 bg-gray-700 rounded-full mt-8">
+                  <motion.div
+                    className="h-2 bg-blue-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${((index + 1) / DAILY_COUNT) * 100}%` }}
+                    transition={{ duration: 0.4 }}
+                  />
+                </div>
+                <p className="text-sm text-gray-500 mt-4">
+                  Question {index + 1} / {DAILY_COUNT}
+                </p>
+              </>
+            ) : (
+              <p>Loading today’s questions…</p>
             )}
-            <p className="text-sm text-gray-500 mt-6">
-              Question {index + 1} / 5
-            </p>
-          </>
-        ) : (
-          <p>Loading today’s questions...</p>
-        )}
-      </>
-    )}
-  </div>
-</main>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </main>
   );
 }
+
 

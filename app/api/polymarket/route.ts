@@ -1,61 +1,89 @@
-// app/api/polymarket/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-// Base endpoints
-const PUBLIC_URL = "https://gamma-api.polymarket.com/markets"; // works for public reads
-const AUTH_URL = "https://clob.polymarket.com/markets"; // for API key mode
+/**
+ * Predictle → Polymarket Fetch Route
+ *
+ * Works in two modes:
+ *  - Public mode: uses open Gamma endpoint (limited data)
+ *  - Authenticated mode: uses your CLOB key (for live price & liquidity)
+ */
+
+const GAMMA_URL = 'https://gamma-api.polymarket.com/markets';
+const CLOB_URL = 'https://clob.polymarket.com/markets';
 
 export async function GET() {
   try {
-    const url = process.env.POLYMARKET_API_KEY ? AUTH_URL : PUBLIC_URL;
+    const apiKey = process.env.POLYMARKET_API_KEY?.trim();
+    const isAuth = !!apiKey;
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    // pick endpoint
+    const endpoint = isAuth ? CLOB_URL : GAMMA_URL;
 
-    if (process.env.POLYMARKET_API_KEY) {
-      headers["X-API-Key"] = process.env.POLYMARKET_API_KEY;
-    }
+    const res = await fetch(endpoint, {
+      headers: isAuth ? { Authorization: `Bearer ${apiKey}` } : {},
+      cache: 'no-store',
+    });
 
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      throw new Error(`Polymarket API error: ${response.statusText}`);
-    }
+    if (!res.ok) throw new Error(`Polymarket HTTP ${res.status}`);
 
-    const data = await response.json();
-    const markets = Array.isArray(data.markets)
-      ? data.markets
-      : data.data || [];
+    const raw = await res.json();
 
-    // Filter: active + not closed + binary + not expired
-    const filtered = markets
-      .filter((m: any) => {
-        const end = m.end_date_iso || m.endDate || m.resolution_date;
-        return (
-          m.active === true &&
-          m.closed === false &&
-          m.archived !== true &&
-          Array.isArray(m.outcomes || m.tokens) &&
-          (m.outcomes?.length === 2 || m.tokens?.length === 2) &&
-          (!end || new Date(end) > new Date())
-        );
-      })
-      .map((m: any) => ({
-        id: m.id || m.condition_id,
-        question: m.question || m.title,
-        outcomes:
-          m.outcomes?.map((o: any) => o.name) ||
-          m.tokens?.map((t: any) => t.ticker || t.outcome),
-        probability:
-          m.outcomes?.[0]?.price ||
-          m.tokens?.[0]?.lastPrice ||
-          m.probability ||
-          null,
-      }));
+    // normalize output shape
+    const markets = normalizeMarkets(raw);
 
-    return NextResponse.json({ count: filtered.length, markets: filtered });
-  } catch (err) {
-    console.error("Error fetching Polymarket data:", err);
-    return NextResponse.json({ error: "Failed to fetch markets" }, { status: 500 });
+    return NextResponse.json({ markets, source: isAuth ? 'CLOB' : 'Gamma' });
+  } catch (err: any) {
+    console.error('[Polymarket API error]', err.message);
+    // fallback safe empty array so Predictle still loads
+    return NextResponse.json({ markets: [], error: err.message || 'fetch failed' }, { status: 200 });
   }
 }
+
+/**
+ * Extracts and normalizes markets into a consistent format.
+ * Keeps only active, binary markets with valid outcomes.
+ */
+function normalizeMarkets(raw: any): any[] {
+  if (!raw) return [];
+
+  // Some endpoints return { data: [...] }, others return an array directly
+  const arr = Array.isArray(raw) ? raw : Array.isArray(raw.data) ? raw.data : [];
+
+  return arr
+    .filter(
+      (m: any) =>
+        m &&
+        !m.archived &&
+        m.active !== false &&
+        m.outcomes &&
+        Array.isArray(m.outcomes) &&
+        m.outcomes.length === 2 &&
+        !/archive|test|2018|2019|2020|2021|2022|2023/i.test(m.question || m.title || '')
+    )
+    .map((m: any) => {
+      const question = m.question || m.title || 'Untitled market';
+      const outcomes = m.outcomes.map((o: any) => ({
+        name: o.name || o.ticker || 'Option',
+        price:
+          typeof o.price === 'number'
+            ? o.price
+            : typeof o.last_price === 'number'
+            ? o.last_price
+            : typeof o?.price?.mid === 'number'
+            ? o.price.mid
+            : undefined,
+      }));
+
+      // crude “probability” = first outcome price (for grading)
+      const probability =
+        typeof outcomes[0]?.price === 'number' ? outcomes[0].price : undefined;
+
+      return {
+        id: m.id || m.condition_id || question,
+        question,
+        outcomes,
+        probability,
+      };
+    });
+}
+
