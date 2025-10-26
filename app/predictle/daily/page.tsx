@@ -39,10 +39,49 @@ export default function PredictleDaily() {
   async function fetchMarketsWithFallback() {
     try {
       const res = await fetch('/api/polymarket');
-      const data = await res.json();
-      setSource(data.source || 'Gamma');
-      const live = normalizeLiveMarkets(data.markets);
-      setQuestions(live.slice(0, 5));
+const data = await res.json();
+setSource(data.source || 'Gamma');
+
+let live = normalizeLiveMarkets(data.markets);
+
+// fallback: if no valid markets, use mock data
+if (!live || live.length === 0) {
+  console.warn('No live markets found — using demo questions');
+  live = [
+    {
+      id: 'demo1',
+      question: 'Will the sun rise tomorrow?',
+      options: ['Yes', 'No'],
+      correctAnswer: 'Yes',
+    },
+    {
+      id: 'demo2',
+      question: 'Will Bitcoin still exist in 2026?',
+      options: ['Yes', 'No'],
+      correctAnswer: 'Yes',
+    },
+    {
+      id: 'demo3',
+      question: 'Will AI models improve next year?',
+      options: ['Yes', 'No'],
+      correctAnswer: 'Yes',
+    },
+    {
+      id: 'demo4',
+      question: 'Will humans colonize Mars before 2035?',
+      options: ['Yes', 'No'],
+      correctAnswer: 'No',
+    },
+    {
+      id: 'demo5',
+      question: 'Will the next iPhone cost over $1,000?',
+      options: ['Yes', 'No'],
+      correctAnswer: 'Yes',
+    },
+  ];
+}
+
+setQuestions(live.slice(0, 20));
     } catch (err) {
       console.error('Error fetching markets:', err);
     }
