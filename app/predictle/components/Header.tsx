@@ -14,16 +14,16 @@ export default function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 flex flex-col items-center py-5 bg-transparent">
-      {/* Logo */}
-      <h1 className="text-cyan-400 text-3xl font-extrabold mb-4 tracking-wide">
+    <header className="sticky top-0 z-40 flex flex-col items-center py-8 bg-transparent">
+      {/* Game Title */}
+      <h1 className="text-cyan-400 text-4xl font-extrabold mb-6 tracking-wide drop-shadow-md">
         PREDICTLE
       </h1>
 
-      {/* Tabs */}
+      {/* Centered Tab Navigation */}
       <nav
-        className="relative flex items-center justify-center bg-gray-900/70 
-                   border border-gray-800 rounded-full p-1 backdrop-blur-sm"
+        className="relative flex items-center justify-center space-x-2 bg-gray-900/60 
+                   border border-gray-800 rounded-full px-2 py-2 backdrop-blur-sm shadow-lg"
       >
         {tabs.map((tab) => {
           const active = pathname === tab.href;
@@ -31,19 +31,21 @@ export default function Header() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`relative z-10 px-6 py-2 text-sm font-medium rounded-full transition-colors
-                ${active ? 'text-white' : 'text-gray-400 hover:text-white'}
-              `}
+              className={`relative z-10 px-6 py-2 text-sm font-semibold rounded-full transition-all duration-200
+                ${active
+                  ? 'text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                }`}
             >
-              {tab.label}
               {active && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute inset-0 rounded-full bg-gradient-to-r 
-                             from-cyan-500 to-blue-500 shadow-[0_0_10px_rgba(56,189,248,0.6)]"
+                  className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500
+                             shadow-[0_0_12px_rgba(56,189,248,0.6)]"
                   transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                 />
               )}
+              <span className="relative z-10">{tab.label}</span>
             </Link>
           );
         })}
@@ -51,4 +53,5 @@ export default function Header() {
     </header>
   );
 }
+
 
