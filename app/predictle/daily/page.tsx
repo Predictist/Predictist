@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import LiveIndicator from '@components/LiveIndicator';
 
 type Question = {
   id: string;
@@ -158,7 +157,7 @@ export default function PredictleDaily() {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen px-4 py-10 text-white bg-gradient-to-b from-gray-950 via-gray-900 to-black">
-      <LiveIndicator source={source} />
+
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
