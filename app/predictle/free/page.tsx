@@ -12,22 +12,22 @@ type Question = {
 };
 
 export default function PredictleFree() {
-  // Pool + current (unlimited rotation)
+  // pool + current (unlimited rotation)
   const [pool, setPool] = useState<Question[]>([]);
   const [current, setCurrent] = useState<Question | null>(null);
 
-  // Score & flow
+  // score / session stats
   const [score, setScore] = useState<number>(0);
+  const [totalPlayed, setTotalPlayed] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState('');
-  const [totalPlayed, setTotalPlayed] = useState(0);
 
-  // Live/Demo pill
-  const [source, setSource] = useState<string>('Gamma'); // 'CLOB' | 'Gamma' | 'Demo'
+  // live/demo pill
+  const [source, setSource] = useState<'CLOB' | 'Gamma' | 'Demo'>('Gamma');
 
   useEffect(() => {
     const storedScore = parseFloat(localStorage.getItem('predictle_fp_score') || '0');
-    setScore(storedScore);
+    if (!Number.isNaN(storedScore)) setScore(storedScore);
     fetchMarketsWithFallback();
   }, []);
 
@@ -36,57 +36,50 @@ export default function PredictleFree() {
       const res = await fetch('/api/polymarket', { cache: 'no-store' });
       const data = await res.json();
 
-      // Normalize live markets
       let live = normalizeLiveMarkets(data?.markets || []);
 
-      // If nothing usable, switch to demo set and mark source as Demo
       if (!live || live.length === 0) {
-        console.warn('No live markets — using demo set');
+        // free play can use demo
+        console.warn('No live markets — using demo set (Free Play)');
         setSource('Demo');
         live = DEMO_SET;
       } else {
-        // Show CLOB only if explicitly returned; otherwise Gamma
         setSource(data?.source === 'CLOB' ? 'CLOB' : 'Gamma');
       }
 
       setPool(live);
       setCurrent(live[Math.floor(Math.random() * live.length)]);
     } catch (err) {
-      console.error('Fetch error — using demo set:', err);
+      console.error('Fetch error — using demo set (Free Play):', err);
       setSource('Demo');
       setPool(DEMO_SET);
       setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
     }
   }
 
-  function normalizeLiveMarkets(
-    raw: any[]
-  ): { id: string; question: string; options: string[]; correctAnswer: string }[] {
+  function normalizeLiveMarkets(raw: any[]): Question[] {
     return (raw || [])
       .map((m: any) => {
-        const question = m.question || m.title || 'Untitled market';
-        const outcomesArr =
+        const q = m.question || m.title || 'Untitled market';
+        const opts =
           (Array.isArray(m.outcomes) && m.outcomes.length === 2 && m.outcomes.map((o: any) => o.name)) ||
           (Array.isArray(m.tokens) && m.tokens.length === 2 && m.tokens.map((t: any) => t.ticker || t.outcome)) ||
           null;
 
-        if (!outcomesArr) return null;
+        if (!opts) return null;
 
-        const p = typeof m.probability === 'number' ? m.probability : undefined; // prob of outcomes[0]
-        const correct =
-          typeof p === 'number' ? (p >= 0.5 ? outcomesArr[0] : outcomesArr[1]) : outcomesArr[0];
+        // probability is for opts[0] if provided
+        const p = typeof m.probability === 'number' ? m.probability : undefined;
+        const correct = typeof p === 'number' ? (p >= 0.5 ? opts[0] : opts[1]) : opts[0];
 
         return {
-          id: String(m.id || m.condition_id || question),
-          question,
-          options: outcomesArr,
+          id: String(m.id || m.condition_id || q),
+          question: q,
+          options: opts,
           correctAnswer: correct,
         };
       })
-      .filter(
-        (m): m is { id: string; question: string; options: string[]; correctAnswer: string } =>
-          Boolean(m)
-      );
+      .filter((m): m is Question => m !== null);
   }
 
   function nextQuestion() {
@@ -110,53 +103,63 @@ export default function PredictleFree() {
     setResult(correct ? '✅ Correct!' : `❌ Wrong — favored: ${current.correctAnswer}`);
     setTotalPlayed((n) => n + 1);
 
-    // rotate automatically after brief pause
     setTimeout(nextQuestion, 1300);
   }
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen p-6 text-center text-white">
+    <main className="relative flex flex-col items-center justify-center min-h-screen px-4 py-10 text-white bg-gradient-to-b from-gray-950 via-gray-900 to-black">
       <LiveIndicator source={source} />
 
-      <div className="predictle-card bg-gray-900 p-8 rounded-2xl shadow-lg max-w-2xl w-full">
-        <h1 className="text-3xl font-bold mb-6">🎮 Predictle — Free Play</h1>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-center border border-gray-700/30"
+      >
+        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
+          🎮 Predictle — Free Play
+        </h1>
+        <p className="text-gray-400 mb-6 text-sm">
+          Unlimited questions. Practice mode using live markets (or demo when unavailable).
+        </p>
 
         <AnimatePresence mode="wait">
           <motion.div
             key={current?.id || totalPlayed}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.4 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
           >
             {current ? (
               <>
-                <p className="text-xl mb-6">{current.question}</p>
+                <p className="text-xl mb-6 font-medium text-gray-100">{current.question}</p>
 
                 {!answered ? (
                   <div className="flex justify-center gap-6">
                     {current.options.map((opt) => (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         key={opt}
                         onClick={() => handleGuess(opt)}
-                        className={`px-6 py-3 rounded-lg text-lg font-medium ${
+                        className={`px-6 py-3 rounded-xl text-lg font-semibold transition ${
                           opt === 'Yes'
-                            ? 'bg-green-600 hover:bg-green-700'
+                            ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20'
                             : opt === 'No'
-                            ? 'bg-red-600 hover:bg-red-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
+                            ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
+                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
                         }`}
                       >
                         {opt}
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 ) : (
                   <motion.p
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className={`text-xl font-semibold mt-4 ${
+                    transition={{ duration: 0.25 }}
+                    className={`text-xl font-semibold mt-5 ${
                       result.startsWith('✅') ? 'text-green-400' : 'text-red-400'
                     }`}
                   >
@@ -164,22 +167,28 @@ export default function PredictleFree() {
                   </motion.p>
                 )}
 
-                <div className="mt-8 text-sm text-gray-400">
-                  <p>Questions Answered: {totalPlayed}</p>
-                  <p>Score: {score.toFixed(1)}</p>
+                <div className="mt-8 grid grid-cols-2 gap-3 text-sm text-gray-300">
+                  <div className="rounded-lg bg-gray-800/70 p-3 border border-gray-700/30">
+                    <p className="text-xs uppercase tracking-wide text-gray-400">Questions Answered</p>
+                    <p className="text-xl font-semibold">{totalPlayed}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-800/70 p-3 border border-gray-700/30">
+                    <p className="text-xs uppercase tracking-wide text-gray-400">Score</p>
+                    <p className="text-xl font-semibold">{score.toFixed(1)}</p>
+                  </div>
                 </div>
               </>
             ) : (
-              <p>Loading questions…</p>
+              <p className="text-gray-400">Loading questions…</p>
             )}
           </motion.div>
         </AnimatePresence>
-      </div>
+      </motion.div>
     </main>
   );
 }
 
-// Local demo backup used when no live markets
+/** Local demo set (Free Play only) */
 const DEMO_SET: Question[] = [
   { id: 'demo1', question: 'Will the sun rise tomorrow?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
   { id: 'demo2', question: 'Will Bitcoin still exist in 2026?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
@@ -187,5 +196,3 @@ const DEMO_SET: Question[] = [
   { id: 'demo4', question: 'Will humans colonize Mars before 2035?', options: ['Yes', 'No'], correctAnswer: 'No' },
   { id: 'demo5', question: 'Will the next iPhone cost over $1,000?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
 ];
-
-

@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Confetti from 'react-confetti';
-import { useWindowSize } from 'react-use';
 import LiveIndicator from '@components/LiveIndicator';
 
 type Question = {
@@ -15,214 +13,241 @@ type Question = {
 
 export default function PredictleDaily() {
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [index, setIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [answered, setAnswered] = useState(false);
-  const [result, setResult] = useState('');
-  const [locked, setLocked] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [source, setSource] = useState<string>('Gamma');
-  const { width, height } = useWindowSize();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<boolean[]>([]);
+  const [finished, setFinished] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [source, setSource] = useState('Gamma');
+  const [nextReset, setNextReset] = useState<string>('');
 
+  const currentQuestion = questions[currentIndex];
+  const score = answers.filter(Boolean).length;
+
+  // Load daily game state
   useEffect(() => {
-    const todayKey = new Date().toDateString();
-    const lastDate = localStorage.getItem('predictle_daily_date');
+    setupDaily();
+  }, []);
 
-    if (lastDate === todayKey) {
-      setLocked(true);
+  // Countdown timer (to next UTC midnight)
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const nextMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+      const diff = nextMidnight.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      setNextReset(`${hours}h ${minutes}m`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function setupDaily() {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const stored = localStorage.getItem('predictle_daily');
+    const parsed = stored ? JSON.parse(stored) : null;
+
+    if (parsed?.date === todayKey) {
+      setQuestions(parsed.questions);
+      setAnswers(parsed.answers);
+      setFinished(parsed.finished);
+      setStreak(parsed.streak || 0);
+      setSource(parsed.source || 'Gamma');
       return;
     }
 
-    fetchMarketsWithFallback();
-  }, []);
+    fetchMarkets(todayKey);
+  }
 
-  async function fetchMarketsWithFallback() {
+  async function fetchMarkets(seed: string) {
     try {
-      const res = await fetch('/api/polymarket');
-const data = await res.json();
-setSource(data.source || 'Gamma');
+      const res = await fetch('/api/polymarket', { cache: 'no-store' });
+      const data = await res.json();
+      const live = normalizeLiveMarkets(data?.markets || []);
 
-let live = normalizeLiveMarkets(data.markets);
+      if (!live || live.length < 5) {
+        console.warn('No valid live markets found.');
+        setQuestions([]);
+        setFinished(true);
+        return;
+      }
 
-// fallback: if no valid markets, use mock data
-if (!live || live.length === 0) {
-  console.warn('No live markets found — using demo questions');
-  live = [
-    {
-      id: 'demo1',
-      question: 'Will the sun rise tomorrow?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-    {
-      id: 'demo2',
-      question: 'Will Bitcoin still exist in 2026?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-    {
-      id: 'demo3',
-      question: 'Will AI models improve next year?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-    {
-      id: 'demo4',
-      question: 'Will humans colonize Mars before 2035?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'No',
-    },
-    {
-      id: 'demo5',
-      question: 'Will the next iPhone cost over $1,000?',
-      options: ['Yes', 'No'],
-      correctAnswer: 'Yes',
-    },
-  ];
-}
-
-setQuestions(live.slice(0, 20));
+      setSource(data?.source === 'CLOB' ? 'CLOB' : 'Gamma');
+      const dailySet = pickDailySet(live, seed, 5);
+      setQuestions(dailySet);
+      persistState(dailySet, [], false);
     } catch (err) {
       console.error('Error fetching markets:', err);
+      setQuestions([]);
+      setFinished(true);
     }
   }
 
-  function normalizeLiveMarkets(
-    raw: any[]
-  ): { id: string; question: string; options: string[]; correctAnswer: string }[] {
+  function pickDailySet(all: Question[], seed: string, count: number) {
+    const seeded = [...all];
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+    for (let i = seeded.length - 1; i > 0; i--) {
+      const j = Math.abs((hash + i * 17) % seeded.length);
+      [seeded[i], seeded[j]] = [seeded[j], seeded[i]];
+    }
+    return seeded.slice(0, count);
+  }
+
+  function normalizeLiveMarkets(raw: any[]): Question[] {
     return (raw || [])
       .map((m: any) => {
-        const question = m.question || m.title || 'Untitled market';
-        const outcomesArr =
+        const q = m.question || m.title || 'Untitled market';
+        const opts =
           (Array.isArray(m.outcomes) && m.outcomes.length === 2 && m.outcomes.map((o: any) => o.name)) ||
           (Array.isArray(m.tokens) && m.tokens.length === 2 && m.tokens.map((t: any) => t.ticker || t.outcome)) ||
           null;
-
-        if (!outcomesArr) return null;
-
+        if (!opts) return null;
         const p = typeof m.probability === 'number' ? m.probability : undefined;
-        const correct =
-          typeof p === 'number' ? (p >= 0.5 ? outcomesArr[0] : outcomesArr[1]) : outcomesArr[0];
-
-        return {
-          id: String(m.id || m.condition_id || question),
-          question,
-          options: outcomesArr,
-          correctAnswer: correct,
-        };
+        const correct = typeof p === 'number' ? (p > 0.5 ? opts[0] : opts[1]) : opts[0];
+        return { id: m.id || q, question: q, options: opts, correctAnswer: correct };
       })
-      .filter(
-        (m): m is { id: string; question: string; options: string[]; correctAnswer: string } =>
-          Boolean(m)
-      );
+      .filter((m): m is Question => m !== null);
   }
 
-  function handleGuess(answer: string) {
-    if (answered) return;
-    const current = questions[index];
-    const isCorrect = answer === current.correctAnswer;
-    setAnswered(true);
-    setResult(isCorrect ? '✅ Correct!' : '❌ Wrong!');
-    if (isCorrect) setScore(score + 1);
+  function handleGuess(choice: string) {
+    if (!currentQuestion || finished) return;
+    const correct = choice === currentQuestion.correctAnswer;
+    const newAnswers = [...answers, correct];
 
-    if (index >= 4) {
-      localStorage.setItem('predictle_daily_date', new Date().toDateString());
-      setLocked(true);
+    if (newAnswers.length === questions.length) {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const prevDate = localStorage.getItem('predictle_last_played');
+      const newStreak = prevDate === todayKey ? streak : streak + 1;
 
-      if (score + (isCorrect ? 1 : 0) >= 5) {
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 5000);
-      }
-      return;
+      setAnswers(newAnswers);
+      setFinished(true);
+      setStreak(newStreak);
+      persistState(questions, newAnswers, true, newStreak);
+      localStorage.setItem('predictle_last_played', todayKey);
+    } else {
+      setAnswers(newAnswers);
+      setCurrentIndex(currentIndex + 1);
+      persistState(questions, newAnswers, false);
     }
-
-    setTimeout(() => {
-      setAnswered(false);
-      setResult('');
-      setIndex((i) => i + 1);
-    }, 1200);
   }
 
-  const q = questions[index];
+  function persistState(q: Question[], a: boolean[], f: boolean, s?: number) {
+    localStorage.setItem(
+      'predictle_daily',
+      JSON.stringify({
+        date: new Date().toISOString().slice(0, 10),
+        questions: q,
+        answers: a,
+        finished: f,
+        streak: s ?? streak,
+        source,
+      })
+    );
+  }
+
+  function shareResults() {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const grid = answers.map((a) => (a ? '🟩' : '🟥')).join('');
+    const text = `Predictle Daily (${todayKey})\n${grid}\nScore: ${score}/5 🔥 Streak: ${streak}`;
+    navigator.clipboard.writeText(text);
+    alert('Results copied! Share your streak 🟩🟥');
+  }
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen p-6 text-center text-white">
+    <main className="flex flex-col items-center justify-center min-h-screen px-4 py-10 text-white bg-gradient-to-b from-gray-950 via-gray-900 to-black">
       <LiveIndicator source={source} />
-      {showConfetti && <Confetti width={width} height={height} recycle={false} />}
 
-      <div className="predictle-card bg-gray-900 p-8 rounded-2xl shadow-lg max-w-2xl w-full">
-        <h1 className="text-3xl font-bold mb-6">📅 Predictle Daily Challenge</h1>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-center border border-gray-700/30"
+      >
+        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
+          📅 Predictle Daily Challenge
+        </h1>
+        <p className="text-gray-400 mb-6 text-sm">5 global questions per day — reset at UTC midnight</p>
 
         <AnimatePresence mode="wait">
-          <motion.div
-            key={q?.id || index}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.4 }}
-          >
-            {locked ? (
+          {!finished ? (
+            currentQuestion ? (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
+                key={currentQuestion.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.3 }}
               >
-                <p className="text-lg text-green-400 mb-2">
-                  ✅ You’ve finished today’s challenge!
-                </p>
-                <p className="text-gray-400 mb-4">Score: {score}/5</p>
-                <p className="text-gray-500">Come back tomorrow for 5 new questions!</p>
-              </motion.div>
-            ) : q ? (
-              <>
-                <p className="text-xl mb-6">{q.question}</p>
+                <p className="text-xl mb-6 font-medium text-gray-100">{currentQuestion.question}</p>
 
-                {!answered ? (
-                  <div className="flex justify-center gap-6">
-                    {q.options.map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => handleGuess(opt)}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-medium"
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <motion.p
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className={`text-xl font-semibold mt-4 ${
-                      result.includes('Correct') ? 'text-green-400' : 'text-red-400'
-                    }`}
-                  >
-                    {result}
-                  </motion.p>
-                )}
-
-                <div className="w-full h-2 bg-gray-700 rounded-full mt-8">
-                  <motion.div
-                    className="h-2 bg-blue-500 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${((index + 1) / 5) * 100}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
+                <div className="flex justify-center gap-6">
+                  {currentQuestion.options.map((opt) => (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      key={opt}
+                      onClick={() => handleGuess(opt)}
+                      className={`px-6 py-3 rounded-xl text-lg font-semibold transition ${
+                        opt === 'Yes'
+                          ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20'
+                          : 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
+                      }`}
+                    >
+                      {opt}
+                    </motion.button>
+                  ))}
                 </div>
-                <p className="text-sm text-gray-500 mt-4">
-                  Question {index + 1} / 5
+
+                <p className="mt-6 text-sm text-gray-400">
+                  Question {currentIndex + 1} of {questions.length}
                 </p>
-              </>
+              </motion.div>
             ) : (
-              <p>Loading questions...</p>
-            )}
-          </motion.div>
+              <p className="text-gray-400">Loading live markets...</p>
+            )
+          ) : (
+            <motion.div
+              key="finished"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4"
+            >
+              <p className="text-lg mb-2 text-green-400 font-semibold">✅ You’ve finished today’s challenge!</p>
+              <p className="text-xl mb-2 font-semibold">
+                Score: {score}/5 <span className="text-sm text-gray-400">🔥 Streak: {streak}</span>
+              </p>
+
+              <div className="flex justify-center gap-2 mb-4 mt-4">
+                {answers.map((a, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                    className={`w-8 h-8 rounded-md shadow ${
+                      a ? 'bg-green-500' : 'bg-red-500'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={shareResults}
+                className="bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg font-medium mt-3 shadow-md"
+              >
+                Share Results 🟩🟥
+              </motion.button>
+
+              <p className="text-sm text-gray-400 mt-5">Next challenge in: {nextReset}</p>
+            </motion.div>
+          )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </main>
   );
 }
-
-
 
