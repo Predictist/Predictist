@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import Header from './components/Header'; // ✅ new connected-tab header
-import './globals.css';
 
 export default function PredictleLayout({ children }: { children: React.ReactNode }) {
   return (
