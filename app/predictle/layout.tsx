@@ -6,6 +6,8 @@ export default function PredictleLayout({
 }: {
   children: React.ReactNode;
 }) {
+  console.log('✅ Predictle layout loaded'); // debug helper
+
   return (
     <html lang="en">
       <body className="bg-[#0A0C10] text-white min-h-screen flex flex-col items-center">
@@ -15,4 +17,5 @@ export default function PredictleLayout({
     </html>
   );
 }
+
 
