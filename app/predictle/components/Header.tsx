@@ -22,7 +22,7 @@ export default function Header() {
       </h1>
 
       {/* Game Mode Toggle */}
-      <nav className="flex items-center justify-center gap-4">
+      <nav className="flex items-center justify-center gap-6">
         {tabs.map((tab) => {
           const active = pathname === tab.href;
           return (
