@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import logo from '@/public/predictle-logo.png';
 
 const tabs = [
   { href: '/predictle/free', label: 'Free Play' },
