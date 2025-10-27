@@ -19,10 +19,10 @@ export default function GameContainer({
         {/* Pill — live/demo */}
         <div
   className={clsx(
-    'absolute top-4 left-4 px-4 py-1.5 rounded-full text-sm font-medium shadow-md border transition-all duration-300',
+    'absolute top-4 left-4 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all duration-300',
     isLiveMode
-      ? 'bg-blue-600 text-white border-blue-400 shadow-blue-500/30'
-      : 'bg-gray-700 text-gray-200 border-gray-600 shadow-gray-500/20'
+      ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.6)]'
+      : 'bg-gray-700 text-gray-300 border-gray-500 shadow-[0_0_8px_rgba(156,163,175,0.3)]'
   )}
 >
   {isLiveMode ? 'Live Mode' : 'Demo Mode'}
