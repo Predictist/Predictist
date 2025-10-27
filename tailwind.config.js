@@ -6,21 +6,19 @@ export default {
     "./components/**/*.{js,ts,jsx,tsx}",
     "./pages/**/*.{js,ts,jsx,tsx}",
   ],
-    safelist: [
-    'bg-blue-600',
+  safelist: [
+    'bg-gradient-to-r',
+    'from-blue-500',
+    'to-cyan-500',
     'text-white',
     'border-blue-400',
     'shadow-blue-500/40',
-    'bg-gray-700',
-    'text-gray-300',
-    'border-gray-500',
-    'shadow-gray-500/30',
+    'hover:bg-gray-800/50',
   ],
   theme: {
     extend: {},
   },
   plugins: [],
 };
-
 
 
