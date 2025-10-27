@@ -21,14 +21,14 @@ export default function GameContainer({
         {/* Mode Pill */}
         <div
           className={`absolute z-10 top-4 left-4
-                      px-5 py-1.5 rounded-full text-sm font-semibold border transition-all duration-300
+                      px-6 py-2 rounded-full text-sm font-semibold border transition-all duration-300
                       ${
                         isLiveMode
                           ? 'bg-blue-600 text-white border-blue-400'
                           : 'border border-[#9ca3af]'
                       }`}
           style={{
-            backgroundColor: isLiveMode ? undefined : '#a1a1aa', // Tailwind gray-500 equivalent
+            backgroundColor: isLiveMode ? undefined : '#8e8e93', // slightly darker gray
             color: 'white',
           }}
         >
