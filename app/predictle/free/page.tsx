@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LiveIndicator from '@components/LiveIndicator';
+import GameContainer from '../components/GameContainer'; // shared layout wrapper
 
 type Question = {
   id: string;
@@ -106,18 +107,22 @@ export default function PredictleFree() {
     setTimeout(nextQuestion, 1300);
   }
 
+  // ✅ wrap the old content inside GameContainer
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen px-4 py-10 text-white bg-gradient-to-b from-gray-950 via-gray-900 to-black">
-      <LiveIndicator source={source} />
+    <GameContainer
+      isLiveMode={source !== 'Demo'}
+      title="🎮 Predictle — Free Play"
+    >
+      {/* move LiveIndicator into top-left */}
+      <div className="absolute top-4 left-4">
+        <LiveIndicator source={source} />
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-center border border-gray-700/30"
+        className="text-center"
       >
-        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
-          🎮 Predictle — Free Play
-        </h1>
         <p className="text-gray-400 mb-6 text-sm">
           Unlimited questions. Practice mode using live markets (or demo when unavailable).
         </p>
@@ -184,7 +189,7 @@ export default function PredictleFree() {
           </motion.div>
         </AnimatePresence>
       </motion.div>
-    </main>
+    </GameContainer>
   );
 }
 
