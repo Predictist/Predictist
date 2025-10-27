@@ -20,15 +20,15 @@ export default function GameContainer({
         
         {/* Mode Pill */}
         <div
-          className={`absolute z-10 top-4 left-4
-                      px-6 py-2 rounded-full text-sm font-semibold border transition-all duration-300
+          className={`absolute z-10 top-4 left-4 inline-flex items-center justify-center
+                      px-5 py-[6px] rounded-full text-sm font-medium border transition-all duration-300 leading-none
                       ${
                         isLiveMode
                           ? 'bg-blue-600 text-white border-blue-400'
                           : 'border border-[#9ca3af]'
                       }`}
           style={{
-            backgroundColor: isLiveMode ? undefined : '#8e8e93', // slightly darker gray
+            backgroundColor: isLiveMode ? undefined : '#8e8e93', // soft neutral gray
             color: 'white',
           }}
         >
