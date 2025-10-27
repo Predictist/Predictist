@@ -15,7 +15,7 @@ export default function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="flex flex-col items-center justify-center py-10 text-white space-y-8">
+    <header className="flex flex-col items-center justify-center py-10 text-white space-y-4">
       {/* Title */}
       <h1 className="text-5xl font-extrabold tracking-wide text-cyan-400 drop-shadow-lg">
         PREDICTLE
