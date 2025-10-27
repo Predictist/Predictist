@@ -24,7 +24,7 @@ export default function PredictleFree() {
   const [result, setResult] = useState('');
 
   // live/demo pill
-  const [source, setSource] = useState<'CLOB' | 'Gamma' | 'Demo'>('Gamma');
+  const [source, setSource] = useState<'CLOB' | 'Gamma' | 'Demo' | null>(null);
 
   useEffect(() => {
     const storedScore = parseFloat(localStorage.getItem('predictle_fp_score') || '0');
@@ -33,30 +33,30 @@ export default function PredictleFree() {
   }, []);
 
   async function fetchMarketsWithFallback() {
-    try {
-      const res = await fetch('/api/polymarket', { cache: 'no-store' });
-      const data = await res.json();
+  try {
+    const res = await fetch('/api/polymarket', { cache: 'no-store' });
+    const data = await res.json();
 
-      let live = normalizeLiveMarkets(data?.markets || []);
+    let live = normalizeLiveMarkets(data?.markets || []);
 
-      if (!live || live.length === 0) {
-        // free play can use demo
-        console.warn('No live markets — using demo set (Free Play)');
-        setSource('Demo');
-        live = DEMO_SET;
-      } else {
-        setSource(data?.source === 'CLOB' ? 'CLOB' : 'Gamma');
-      }
-
-      setPool(live);
-      setCurrent(live[Math.floor(Math.random() * live.length)]);
-    } catch (err) {
-      console.error('Fetch error — using demo set (Free Play):', err);
+    if (!live || live.length === 0) {
+      console.warn('No live markets — using demo set (Free Play)');
       setSource('Demo');
-      setPool(DEMO_SET);
-      setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
+      live = DEMO_SET;
+    } else {
+      const detectedSource = data?.source === 'CLOB' ? 'CLOB' : 'Gamma';
+      setSource(detectedSource);
     }
+
+    setPool(live);
+    setCurrent(live[Math.floor(Math.random() * live.length)]);
+  } catch (err) {
+    console.error('Fetch error — using demo set (Free Play):', err);
+    setSource('Demo');
+    setPool(DEMO_SET);
+    setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
   }
+}
 
   function normalizeLiveMarkets(raw: any[]): Question[] {
     return (raw || [])
@@ -113,7 +113,7 @@ export default function PredictleFree() {
   isLiveMode={source === 'CLOB' || source === 'Gamma'}
   title="🎮 Predictle — Free Play"
 >
-
+    
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
