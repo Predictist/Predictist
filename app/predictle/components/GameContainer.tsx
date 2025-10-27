@@ -21,15 +21,15 @@ export default function GameContainer({
         {/* Mode Pill */}
         <div
           className={`absolute z-10 top-4 left-4
-                      px-4 py-1.5 rounded-full text-sm font-semibold border transition-all duration-300
+                      px-5 py-1.5 rounded-full text-sm font-semibold border transition-all duration-300
                       ${
                         isLiveMode
                           ? 'bg-blue-600 text-white border-blue-400'
-                          : 'bg-[#d1d5db] text-black border border-[#9ca3af]'
+                          : 'border border-[#9ca3af]'
                       }`}
           style={{
-            backgroundColor: isLiveMode ? undefined : '#d1d5db',
-            color: isLiveMode ? undefined : '#111',
+            backgroundColor: isLiveMode ? undefined : '#a1a1aa', // Tailwind gray-500 equivalent
+            color: 'white',
           }}
         >
           {isLiveMode ? 'Live Mode' : 'Demo Mode'}
@@ -46,3 +46,4 @@ export default function GameContainer({
     </div>
   );
 }
+
