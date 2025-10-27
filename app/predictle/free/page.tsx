@@ -110,9 +110,9 @@ export default function PredictleFree() {
   // ✅ wrap the old content inside GameContainer
   return (
     <GameContainer
-      isLiveMode={source !== 'Demo'}
-      title="🎮 Predictle — Free Play"
-    >
+  isLiveMode={source === 'CLOB' || source === 'Gamma'}
+  title="🎮 Predictle — Free Play"
+>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
