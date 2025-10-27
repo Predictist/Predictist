@@ -22,26 +22,26 @@ export default function Header() {
       </h1>
 
       {/* Game Mode Toggle */}
-      <nav className="flex items-center justify-center gap-8">
-        {tabs.map((tab) => {
-          const active = pathname === tab.href;
-          return (
-            <motion.div key={tab.href} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-              <Link
-                href={tab.href}
-                className={clsx(
-                  'relative px-8 py-3 rounded-full text-base font-semibold transition-all duration-300 border border-gray-700/60 shadow-sm',
-                  active
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg border-blue-500/50'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/40'
-                )}
-              >
-                {tab.label}
-              </Link>
-            </motion.div>
-          );
-        })}
-      </nav>
+      <nav className="flex items-center justify-center gap-10 mt-2">
+  {tabs.map((tab) => {
+    const active = pathname === tab.href;
+    return (
+      <motion.div key={tab.href} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
+        <Link
+          href={tab.href}
+          className={clsx(
+            'relative px-10 py-3 rounded-full text-lg font-semibold border transition-all duration-300',
+            active
+              ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.6)]'
+              : 'text-gray-400 border-gray-700 hover:text-white hover:bg-gray-800/50'
+          )}
+        >
+          {tab.label}
+        </Link>
+      </motion.div>
+    );
+  })}
+</nav>
     </header>
   );
 }
