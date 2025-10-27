@@ -18,10 +18,10 @@ export default function GameContainer({
       {/* Outer game box */}
       <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl p-10 w-full max-w-3xl text-center border border-gray-700/40">
         
-        {/* Mode Pill */}
+        {/* Mode Pill (now chip-style) */}
         <div
           className={`absolute z-10 top-4 left-4 flex items-center justify-center
-                      px-8 py-[7px] rounded-full text-sm font-medium border transition-all duration-300 leading-none tracking-wide
+                      px-8 py-[7px] rounded-xl text-sm font-medium border transition-all duration-300 leading-none tracking-wide
                       ${
                         isLiveMode
                           ? 'bg-blue-600 text-white border-blue-400'
