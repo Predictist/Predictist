@@ -1,30 +1,40 @@
 'use client';
+
 import React from 'react';
+import clsx from 'clsx';
 
-interface GameContainerProps {
-  isLiveMode?: boolean;
-  title: string;
+export default function GameContainer({
+  children,
+  isLiveMode,
+  title,
+}: {
   children: React.ReactNode;
-}
-
-export default function GameContainer({ isLiveMode = false, title, children }: GameContainerProps) {
+  isLiveMode: boolean;
+  title: string;
+}) {
   return (
-    <div className="relative bg-gray-900/60 backdrop-blur-md border border-gray-800 rounded-2xl p-8 shadow-xl w-full max-w-2xl mx-auto mt-6">
-      {/* Mode Indicator Pill */}
-      <div
-        className={`absolute top-4 left-4 px-4 py-1 rounded-full text-sm font-semibold ${
-          isLiveMode
-            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
-            : 'bg-gray-700 text-gray-300'
-        }`}
-      >
-        {isLiveMode ? 'Live Mode' : 'Demo Mode'}
+    <div className="relative flex flex-col items-center justify-center min-h-screen px-4 py-10 text-white bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+      {/* Outer game box */}
+      <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl p-10 w-full max-w-3xl text-center border border-gray-700/40">
+        {/* Pill — live/demo */}
+        <div
+          className={clsx(
+            'absolute top-4 left-4 px-4 py-1.5 rounded-full text-sm font-medium shadow-md transition-colors',
+            isLiveMode
+              ? 'bg-blue-600/80 text-white border border-blue-400/40'
+              : 'bg-gray-700/80 text-gray-200 border border-gray-600/40'
+          )}
+        >
+          {isLiveMode ? 'Live Mode' : 'Demo Mode'}
+        </div>
+
+        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
+          {title}
+        </h1>
+
+        <div className="mt-6">{children}</div>
       </div>
-
-      {/* Game Title */}
-      <h2 className="text-2xl font-bold text-center mb-6">{title}</h2>
-
-      {children}
     </div>
   );
 }
+

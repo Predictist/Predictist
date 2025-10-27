@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
+import clsx from 'clsx';
 
 const tabs = [
   { href: '/predictle/free', label: 'Free Play' },
@@ -14,27 +15,30 @@ export default function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="flex flex-col items-center justify-center py-10 text-white space-y-6">
+    <header className="flex flex-col items-center justify-center py-10 text-white space-y-8">
+      {/* Title */}
       <h1 className="text-5xl font-extrabold tracking-wide text-cyan-400 drop-shadow-lg">
         PREDICTLE
       </h1>
 
       {/* Game Mode Toggle */}
-      <nav className="relative flex items-center justify-center bg-gray-900/60 backdrop-blur-md border border-gray-800 rounded-full px-4 py-2 shadow-md gap-4">
+      <nav className="flex items-center justify-center gap-4">
         {tabs.map((tab) => {
           const active = pathname === tab.href;
           return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
-                active
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md scale-105'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-              }`}
-            >
-              {tab.label}
-            </Link>
+            <motion.div key={tab.href} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
+              <Link
+                href={tab.href}
+                className={clsx(
+                  'relative px-8 py-3 rounded-full text-base font-semibold transition-all duration-300 border border-gray-700/60 shadow-sm',
+                  active
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg border-blue-500/50'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/40'
+                )}
+              >
+                {tab.label}
+              </Link>
+            </motion.div>
           );
         })}
       </nav>
