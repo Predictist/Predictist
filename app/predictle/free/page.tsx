@@ -114,9 +114,7 @@ export default function PredictleFree() {
       title="🎮 Predictle — Free Play"
     >
       {/* move LiveIndicator into top-left */}
-      <div className="absolute top-4 left-4">
         <LiveIndicator source={source} />
-      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

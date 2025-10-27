@@ -157,9 +157,7 @@ export default function PredictleDaily() {
 
   return (
     <GameContainer isLiveMode={source !== 'Demo'} title="📅 Predictle — Daily Challenge">
-      <div className="absolute top-4 left-4">
         <LiveIndicator source={source} />
-      </div>
 
       <AnimatePresence mode="wait">
         {!finished ? (

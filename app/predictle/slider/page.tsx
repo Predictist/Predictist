@@ -93,9 +93,7 @@ export default function PredictleSlider() {
 
   return (
     <GameContainer isLiveMode={source !== 'Demo'} title="🎚️ Predictle — Slider Mode">
-      <div className="absolute top-4 left-4">
         <LiveIndicator source={source} />
-      </div>
 
       <AnimatePresence mode="wait">
         {current ? (
