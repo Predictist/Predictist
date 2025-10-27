@@ -25,8 +25,12 @@ export default function GameContainer({
                       ${
                         isLiveMode
                           ? 'bg-blue-600 text-white border-blue-400'
-                          : 'bg-gray-300 text-gray-800 border-gray-400'
+                          : 'bg-[#d1d5db] text-black border border-[#9ca3af]'
                       }`}
+          style={{
+            backgroundColor: isLiveMode ? undefined : '#d1d5db',
+            color: isLiveMode ? undefined : '#111',
+          }}
         >
           {isLiveMode ? 'Live Mode' : 'Demo Mode'}
         </div>
