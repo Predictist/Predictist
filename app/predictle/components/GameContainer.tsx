@@ -20,8 +20,8 @@ export default function GameContainer({
         
         {/* Mode Pill */}
         <div
-          className={`absolute z-10 top-4 left-4 inline-flex items-center justify-center
-                      px-5 py-[6px] rounded-full text-sm font-medium border transition-all duration-300 leading-none
+          className={`absolute z-10 top-4 left-4 flex items-center justify-center
+                      px-7 py-[7px] rounded-full text-sm font-medium border transition-all duration-300 leading-none
                       ${
                         isLiveMode
                           ? 'bg-blue-600 text-white border-blue-400'
@@ -46,4 +46,5 @@ export default function GameContainer({
     </div>
   );
 }
+
 
