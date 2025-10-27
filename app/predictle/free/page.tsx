@@ -113,8 +113,6 @@ export default function PredictleFree() {
       isLiveMode={source !== 'Demo'}
       title="🎮 Predictle — Free Play"
     >
-      {/* move LiveIndicator into top-left */}
-        <LiveIndicator source={source} />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
