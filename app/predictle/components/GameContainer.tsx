@@ -21,12 +21,12 @@ export default function GameContainer({
         {/* Mode Pill */}
         <div
           className={`absolute z-10 top-4 left-4
-                      px-3.5 py-1.5 rounded-full text-sm font-semibold
-                      shadow-lg ring-1 transition-all duration-300
+                      px-4 py-1.5 rounded-full text-sm font-semibold
+                      shadow-lg transition-all duration-300
                       ${
                         isLiveMode
-                          ? 'bg-sky-600 text-white ring-sky-400'
-                          : 'bg-zinc-800 text-zinc-200 ring-zinc-600'
+                          ? 'bg-sky-600 text-white border border-sky-400 shadow-sky-400/50'
+                          : 'bg-gray-200 text-gray-800 border border-gray-300 shadow-gray-400/50'
                       }`}
         >
           {isLiveMode ? 'Live Mode' : 'Demo Mode'}
