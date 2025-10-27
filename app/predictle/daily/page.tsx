@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import GameContainer from '../components/GameContainer';
+import LiveIndicator from '@components/LiveIndicator';
 
 type Question = {
   id: string;
@@ -22,12 +24,10 @@ export default function PredictleDaily() {
   const currentQuestion = questions[currentIndex];
   const score = answers.filter(Boolean).length;
 
-  // Load daily game state
   useEffect(() => {
     setupDaily();
   }, []);
 
-  // Countdown timer (to next UTC midnight)
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date();
@@ -156,97 +156,87 @@ export default function PredictleDaily() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen px-4 py-10 text-white bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+    <GameContainer isLiveMode={source !== 'Demo'} title="📅 Predictle — Daily Challenge">
+      <div className="absolute top-4 left-4">
+        <LiveIndicator source={source} />
+      </div>
 
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-center border border-gray-700/30"
-      >
-        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
-          📅 Predictle Daily Challenge
-        </h1>
-        <p className="text-gray-400 mb-6 text-sm">5 global questions per day — reset at UTC midnight</p>
-
-        <AnimatePresence mode="wait">
-          {!finished ? (
-            currentQuestion ? (
-              <motion.div
-                key={currentQuestion.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.3 }}
-              >
-                <p className="text-xl mb-6 font-medium text-gray-100">{currentQuestion.question}</p>
-
-                <div className="flex justify-center gap-6">
-                  {currentQuestion.options.map((opt) => (
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      key={opt}
-                      onClick={() => handleGuess(opt)}
-                      className={`px-6 py-3 rounded-xl text-lg font-semibold transition ${
-                        opt === 'Yes'
-                          ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20'
-                          : 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
-                      }`}
-                    >
-                      {opt}
-                    </motion.button>
-                  ))}
-                </div>
-
-                <p className="mt-6 text-sm text-gray-400">
-                  Question {currentIndex + 1} of {questions.length}
-                </p>
-              </motion.div>
-            ) : (
-              <p className="text-gray-400">Loading live markets...</p>
-            )
-          ) : (
+      <AnimatePresence mode="wait">
+        {!finished ? (
+          currentQuestion ? (
             <motion.div
-              key="finished"
+              key={currentQuestion.id}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4"
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
             >
-              <p className="text-lg mb-2 text-green-400 font-semibold">✅ You’ve finished today’s challenge!</p>
-              <p className="text-xl mb-2 font-semibold">
-                Score: {score}/5 <span className="text-sm text-gray-400">🔥 Streak: {streak}</span>
-              </p>
+              <p className="text-xl mb-6 font-medium text-gray-100">{currentQuestion.question}</p>
 
-              <div className="flex justify-center gap-2 mb-4 mt-4">
-                {answers.map((a, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: i * 0.1 }}
-                    className={`w-8 h-8 rounded-md shadow ${
-                      a ? 'bg-green-500' : 'bg-red-500'
+              <div className="flex justify-center gap-6">
+                {currentQuestion.options.map((opt) => (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    key={opt}
+                    onClick={() => handleGuess(opt)}
+                    className={`px-6 py-3 rounded-xl text-lg font-semibold transition ${
+                      opt === 'Yes'
+                        ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20'
+                        : 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
                     }`}
-                  />
+                  >
+                    {opt}
+                  </motion.button>
                 ))}
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={shareResults}
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg font-medium mt-3 shadow-md"
-              >
-                Share Results 🟩🟥
-              </motion.button>
-
-              <p className="text-sm text-gray-400 mt-5">Next challenge in: {nextReset}</p>
+              <p className="mt-6 text-sm text-gray-400">
+                Question {currentIndex + 1} of {questions.length}
+              </p>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </main>
+          ) : (
+            <p className="text-gray-400">Loading live markets...</p>
+          )
+        ) : (
+          <motion.div
+            key="finished"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4"
+          >
+            <p className="text-lg mb-2 text-green-400 font-semibold">✅ You’ve finished today’s challenge!</p>
+            <p className="text-xl mb-2 font-semibold">
+              Score: {score}/5 <span className="text-sm text-gray-400">🔥 Streak: {streak}</span>
+            </p>
+
+            <div className="flex justify-center gap-2 mb-4 mt-4">
+              {answers.map((a, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.1 }}
+                  className={`w-8 h-8 rounded-md shadow ${a ? 'bg-green-500' : 'bg-red-500'}`}
+                />
+              ))}
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={shareResults}
+              className="bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg font-medium mt-3 shadow-md"
+            >
+              Share Results 🟩🟥
+            </motion.button>
+
+            <p className="text-sm text-gray-400 mt-5">Next challenge in: {nextReset}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </GameContainer>
   );
 }
+
 
