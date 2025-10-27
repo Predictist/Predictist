@@ -4,7 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import logo from '/predictle-logo.png';
 
 const tabs = [
   { href: '/predictle/free', label: 'Free Play' },
@@ -20,12 +19,12 @@ export default function Header() {
       {/* Logo Section */}
       <div className="flex flex-col items-center space-y-3">
         <Image
-          src={logo}
-          alt="Predictle Logo"
-          width={140}
-          height={140}
-          className="drop-shadow-[0_0_18px_rgba(34,211,238,0.5)]"
-        />
+  src="/predictle-logo.png" // ✅ reference public folder root
+  alt="Predictle Logo"
+  width={140}
+  height={140}
+  className="drop-shadow-[0_0_18px_rgba(34,211,238,0.5)]"
+/>
         <div className="w-40 h-[2px] bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full opacity-70" />
       </div>
 
