@@ -21,7 +21,7 @@ export default function Header() {
       </h1>
 
       {/* Navigation Tabs */}
-      <nav className="flex items-center justify-center gap-6">
+      <nav className="flex items-center justify-center gap-8">
         {tabs.map((tab) => {
           const active = pathname === tab.href;
           return (
@@ -29,10 +29,10 @@ export default function Header() {
               key={tab.href}
               href={tab.href}
               className={clsx(
-                'px-8 py-3 rounded-full text-base font-semibold border transition-all duration-300',
+                'px-10 py-3 rounded-full text-base font-semibold transition-all duration-300 border shadow-md',
                 active
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/40'
-                  : 'text-gray-300 border-gray-600 hover:text-white hover:bg-gray-800/50 hover:border-gray-500'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-blue-400 shadow-blue-500/40'
+                  : 'bg-transparent text-gray-300 border-gray-600 hover:text-white hover:bg-gray-800/50 hover:border-gray-500'
               )}
             >
               {tab.label}
@@ -43,6 +43,7 @@ export default function Header() {
     </header>
   );
 }
+
 
 
 
