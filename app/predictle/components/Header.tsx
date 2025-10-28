@@ -27,45 +27,40 @@ export default function Header() {
       />
 
       {/* Mode Buttons – glossy blue capsules */}
-      <nav className="mt-8 flex flex-wrap items-center justify-center gap-8">
-        {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href);
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={clsx(
-                'relative isolate rounded-2xl px-8 py-4 text-lg font-semibold leading-none',
-                'transition-all duration-200 hover:-translate-y-0.5 focus:outline-none',
-                'ring-1 ring-inset',
-                // text is always white in mock
-                'text-white',
-                // ring color + shadow depend on active
-                active
-                  ? 'ring-cyan-400 shadow-[0_10px_30px_rgba(56,189,248,0.35)]'
-                  : 'ring-slate-500/40 shadow-[0_8px_24px_rgba(56,189,248,0.15)]'
-              )}
-            >
-              {/* glossy gradient fill (layered behind text) */}
-              <span
-                aria-hidden
-                className={clsx(
-                  'absolute inset-0 -z-10 rounded-2xl bg-gradient-to-b',
-                  active
-                    ? 'from-cyan-400 to-blue-600 opacity-100'
-                    : 'from-cyan-500 to-blue-700 opacity-80'
-                )}
-              />
-              {/* subtle top shine */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-white/15"
-              />
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Navigation Tabs */}
+<nav className="flex items-center justify-center gap-8 mt-8">
+  {tabs.map((tab) => {
+    const active = pathname?.startsWith(tab.href) ?? false;
+    return (
+      <Link
+        key={tab.href}
+        href={tab.href}
+        className={clsx(
+          'relative isolate rounded-2xl px-10 py-4 text-lg font-semibold leading-none transition-all duration-300',
+          'focus:outline-none shadow-md hover:-translate-y-0.5',
+          active
+            ? 'text-white'
+            : 'text-white/90 hover:text-white'
+        )}
+      >
+        {/* Blue glossy background */}
+        <span
+          aria-hidden
+          className={clsx(
+            'absolute inset-0 -z-10 rounded-2xl bg-gradient-to-b from-cyan-400 to-blue-600 transition-all duration-300',
+            active ? 'opacity-100' : 'opacity-70 hover:opacity-90'
+          )}
+        />
+        {/* Subtle top shine */}
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-white/15"
+        />
+        {tab.label}
+      </Link>
+    );
+  })}
+</nav>
     </header>
   );
 }
