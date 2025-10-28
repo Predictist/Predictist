@@ -39,21 +39,30 @@ export default function Header() {
 {/* Navigation Tabs */}
 <nav className="flex items-center justify-center gap-6 mt-10">
   {tabs.map((tab) => {
-    const active = pathname?.startsWith(tab.href) ?? false
+    const active = pathname?.startsWith(tab.href) ?? false;
     return (
       <Link
         key={tab.href}
         href={tab.href}
         className={clsx(
-          'px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 shadow-md focus:outline-none',
+          'relative px-8 py-3 rounded-xl text-lg font-semibold transition-all duration-300 overflow-hidden border focus:outline-none',
           active
-            ? 'bg-blue-600 text-white shadow-blue-500/30 hover:bg-blue-700 hover:shadow-blue-500/40'
-            : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 hover:text-white hover:shadow-gray-500/30'
+            ? 'text-white border-blue-600'
+            : 'text-gray-300 border-gray-600 hover:text-white hover:border-gray-400'
         )}
       >
+        {/* background layer */}
+        <span
+          className={clsx(
+            'absolute inset-0 rounded-xl transition-all duration-300 -z-10',
+            active
+              ? 'bg-blue-600'
+              : 'bg-gray-800 hover:bg-gray-700'
+          )}
+        />
         {tab.label}
       </Link>
-    )
+    );
   })}
 </nav>
     </header>
