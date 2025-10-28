@@ -22,11 +22,11 @@ export default {
 ],
 safelist: [
   'bg-gradient-to-b',
-  'from-cyan-400','from-cyan-500',
-  'to-blue-600','to-blue-700',
-  'ring-cyan-400','ring-slate-500/40',
-  'shadow-[0_10px_30px_rgba(56,189,248,0.35)]',
-  'shadow-[0_8px_24px_rgba(56,189,248,0.15)]',
+  'from-cyan-400',
+  'to-blue-600',
+  'from-cyan-500',
+  'to-blue-700',
+  'bg-white/15',
 ],
   theme: {
     extend: {},
