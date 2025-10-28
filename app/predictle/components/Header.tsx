@@ -25,7 +25,7 @@ export default function Header() {
             src="/predictle-logo.png"
             alt="Predictle Logo"
             width={300} // ✅ larger logo
-            height={240}
+            height={300}
             className="mx-auto mb-4 rounded-lg bg-transparent"
             priority
           />
