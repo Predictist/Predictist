@@ -39,19 +39,20 @@ export default function Header() {
           const active = pathname?.startsWith(tab.href);
           return (
             <Link
-              key={tab.href}
-              href={tab.href}
-              className={clsx(
-                'relative px-10 py-4 rounded-full text-lg font-semibold border transition-all duration-300 tracking-wide',
-                active
-                  ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-white border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]'
-                  : 'text-gray-300 border-gray-600 hover:text-white hover:shadow-[0_0_15px_rgba(34,211,238,0.6)] hover:bg-gray-800/40 hover:border-gray-500'
-              )}
-            >
-              {/* Animated light sweep */}
-              <span className="relative z-10">{tab.label}</span>
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-300/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-700 rounded-full" />
-            </Link>
+  key={tab.href}
+  href={tab.href}
+  className={clsx(
+    'relative px-10 py-4 rounded-full text-lg font-semibold border transition-all duration-300 tracking-wide overflow-hidden',
+    active
+      ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-white border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+      : 'bg-transparent text-gray-300 border-gray-600 hover:text-white hover:shadow-[0_0_15px_rgba(34,211,238,0.6)] hover:bg-gray-800/40 hover:border-gray-500'
+  )}
+>
+  <span className="relative z-10">{tab.label}</span>
+  {active && (
+    <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-600 opacity-80 rounded-full" />
+  )}
+</Link>
           );
         })}
       </nav>
