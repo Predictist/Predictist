@@ -36,7 +36,7 @@ export default function Header() {
       {/* Navigation Tabs */}
       <nav className="flex items-center justify-center gap-10 mt-10">
         {tabs.map((tab) => {
-          const active = pathname === tab.href;
+          const active = pathname?.startsWith(tab.href);
           return (
             <Link
               key={tab.href}
