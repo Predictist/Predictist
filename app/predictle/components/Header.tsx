@@ -26,7 +26,7 @@ export default function Header() {
             alt="Predictle Logo"
             width={240} // ✅ larger logo
             height={240}
-            className="relative drop-shadow-[0_0_25px_rgba(34,211,238,0.6)]"
+            className="mx-auto mb-4 rounded-lg bg-transparent"
             priority
           />
         </div>
