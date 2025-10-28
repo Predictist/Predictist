@@ -13,6 +13,7 @@ const tabs = [
 
 export default function Header() {
   const pathname = usePathname();
+  console.log('PATHNAME:', pathname);
 
   return (
     <header className="flex flex-col items-center justify-center py-16 text-white bg-gradient-to-b from-gray-950 via-[#0b0e14] to-black">
