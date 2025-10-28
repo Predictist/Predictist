@@ -34,28 +34,26 @@ export default function Header() {
       </div>
 
       {/* Navigation Tabs */}
-      <nav className="flex items-center justify-center gap-10 mt-10">
-        {tabs.map((tab) => {
-          const active = pathname?.startsWith(tab.href);
-          return (
-            <Link
-  key={tab.href}
-  href={tab.href}
-  className={clsx(
-    'relative px-10 py-4 rounded-full text-lg font-semibold border transition-all duration-300 tracking-wide overflow-hidden',
-    active
-      ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-white border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]'
-      : 'bg-transparent text-gray-300 border-gray-600 hover:text-white hover:shadow-[0_0_15px_rgba(34,211,238,0.6)] hover:bg-gray-800/40 hover:border-gray-500'
-  )}
->
-  <span className="relative z-10">{tab.label}</span>
-  {active && (
-    <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-600 opacity-80 rounded-full" />
-  )}
-</Link>
-          );
-        })}
-      </nav>
+      {/* Navigation Tabs */}
+<nav className="flex items-center justify-center gap-6 mt-10">
+  {tabs.map((tab) => {
+    const active = pathname?.startsWith(tab.href) ?? false;
+    return (
+      <Link
+        key={tab.href}
+        href={tab.href}
+        className={clsx(
+          'px-8 py-3 rounded-xl text-base font-semibold transition-all duration-300 shadow-md border',
+          active
+            ? 'bg-blue-600 text-white border-blue-400 shadow-blue-500/30 hover:bg-blue-700 hover:shadow-blue-500/40'
+            : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white hover:border-gray-500 hover:shadow-gray-500/20'
+        )}
+      >
+        {tab.label}
+      </Link>
+    );
+  })}
+</nav>
     </header>
   );
 }
