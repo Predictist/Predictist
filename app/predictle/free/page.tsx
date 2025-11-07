@@ -29,31 +29,32 @@ export default function PredictleFree() {
   }, []);
 
   async function fetchMarketsWithFallback() {
-    try {
-      // Fetch from dashboard API
-      const markets = await getMarkets(100);
+  console.log("Fetching from dashboard API...");
+  try {
+    const markets = await getMarkets(100);
+    console.log("Raw markets from API:", markets);
 
-      // Normalize to Question[] format
-      const normalized = normalizeLiveMarkets(markets);
+    const normalized = normalizeLiveMarkets(markets);
+    console.log("Normalized markets:", normalized);
 
-      if (!normalized || normalized.length === 0) {
-        console.warn('No live markets — using demo set (Free Play)');
-        setSource('Demo');
-        setPool(DEMO_SET);
-        setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
-      } else {
-        // Assume CLOB (dashboard uses Polymarket)
-        setSource('CLOB');
-        setPool(normalized);
-        setCurrent(normalized[Math.floor(Math.random() * normalized.length)]);
-      }
-    } catch (err) {
-      console.error('Fetch error — using demo set (Free Play):', err);
+    if (!normalized || normalized.length === 0) {
+      console.warn('No valid markets — falling back to DEMO_SET');
       setSource('Demo');
       setPool(DEMO_SET);
       setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
+    } else {
+      console.log("Using live markets!");
+      setSource('CLOB');
+      setPool(normalized);
+      setCurrent(normalized[Math.floor(Math.random() * normalized.length)]);
     }
+  } catch (err) {
+    console.error('API fetch failed:', err);
+    setSource('Demo');
+    setPool(DEMO_SET);
+    setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
   }
+}
 
   function normalizeLiveMarkets(raw: any[]): Question[] {
     return (raw || [])
