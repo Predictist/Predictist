@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LiveIndicator from '@components/LiveIndicator';
-import GameContainer from '../components/GameContainer'; // shared layout wrapper
+import GameContainer from '../components/GameContainer';
+import { getMarkets } from "@/lib/api";
 
 type Question = {
   id: string;
@@ -13,17 +14,12 @@ type Question = {
 };
 
 export default function PredictleFree() {
-  // pool + current (unlimited rotation)
   const [pool, setPool] = useState<Question[]>([]);
   const [current, setCurrent] = useState<Question | null>(null);
-
-  // score / session stats
   const [score, setScore] = useState<number>(0);
   const [totalPlayed, setTotalPlayed] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState('');
-
-  // live/demo pill
   const [source, setSource] = useState<'CLOB' | 'Gamma' | 'Demo' | null>(null);
 
   useEffect(() => {
@@ -33,30 +29,31 @@ export default function PredictleFree() {
   }, []);
 
   async function fetchMarketsWithFallback() {
-  try {
-    const res = await fetch('/api/polymarket', { cache: 'no-store' });
-    const data = await res.json();
+    try {
+      // Fetch from dashboard API
+      const markets = await getMarkets(100);
 
-    let live = normalizeLiveMarkets(data?.markets || []);
+      // Normalize to Question[] format
+      const normalized = normalizeLiveMarkets(markets);
 
-    if (!live || live.length === 0) {
-      console.warn('No live markets — using demo set (Free Play)');
+      if (!normalized || normalized.length === 0) {
+        console.warn('No live markets — using demo set (Free Play)');
+        setSource('Demo');
+        setPool(DEMO_SET);
+        setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
+      } else {
+        // Assume CLOB (dashboard uses Polymarket)
+        setSource('CLOB');
+        setPool(normalized);
+        setCurrent(normalized[Math.floor(Math.random() * normalized.length)]);
+      }
+    } catch (err) {
+      console.error('Fetch error — using demo set (Free Play):', err);
       setSource('Demo');
-      live = DEMO_SET;
-    } else {
-      const detectedSource = data?.source === 'CLOB' ? 'CLOB' : 'Gamma';
-      setSource(detectedSource);
+      setPool(DEMO_SET);
+      setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
     }
-
-    setPool(live);
-    setCurrent(live[Math.floor(Math.random() * live.length)]);
-  } catch (err) {
-    console.error('Fetch error — using demo set (Free Play):', err);
-    setSource('Demo');
-    setPool(DEMO_SET);
-    setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
   }
-}
 
   function normalizeLiveMarkets(raw: any[]): Question[] {
     return (raw || [])
@@ -69,8 +66,7 @@ export default function PredictleFree() {
 
         if (!opts) return null;
 
-        // probability is for opts[0] if provided
-        const p = typeof m.probability === 'number' ? m.probability : undefined;
+        const p = typeof m.yes_price === 'number' ? m.yes_price : undefined;
         const correct = typeof p === 'number' ? (p >= 0.5 ? opts[0] : opts[1]) : opts[0];
 
         return {
@@ -101,19 +97,17 @@ export default function PredictleFree() {
     localStorage.setItem('predictle_fp_score', String(newScore));
 
     setAnswered(true);
-    setResult(correct ? '✅ Correct!' : `❌ Wrong — favored: ${current.correctAnswer}`);
+    setResult(correct ? 'Correct!' : `Wrong — favored: ${current.correctAnswer}`);
     setTotalPlayed((n) => n + 1);
 
     setTimeout(nextQuestion, 1300);
   }
 
-  // ✅ wrap the old content inside GameContainer
   return (
     <GameContainer
-  isLiveMode={source === 'CLOB' || source === 'Gamma'}
-  title="🎮 Predictle — Free Play"
->
-    
+      isLiveMode={source === 'CLOB' || source === 'Gamma'}
+      title="Predictle — Free Play"
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -161,7 +155,7 @@ export default function PredictleFree() {
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.25 }}
                     className={`text-xl font-semibold mt-5 ${
-                      result.startsWith('✅') ? 'text-green-400' : 'text-red-400'
+                      result.startsWith('Correct') ? 'text-green-400' : 'text-red-400'
                     }`}
                   >
                     {result}
@@ -189,7 +183,7 @@ export default function PredictleFree() {
   );
 }
 
-/** Local demo set (Free Play only) */
+/** Local demo set */
 const DEMO_SET: Question[] = [
   { id: 'demo1', question: 'Will the sun rise tomorrow?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
   { id: 'demo2', question: 'Will Bitcoin still exist in 2026?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
