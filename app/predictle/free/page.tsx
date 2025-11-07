@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import LiveIndicator from '@components/LiveIndicator';
 import GameContainer from '../components/GameContainer';
 import { getMarkets } from "@/lib/api";
 
 type Question = {
   id: string;
   question: string;
-  options: string[];
+  options: [string, string];  // Always exactly 2
   correctAnswer: string;
 };
 
@@ -20,7 +19,7 @@ export default function PredictleFree() {
   const [totalPlayed, setTotalPlayed] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState('');
-  const [source, setSource] = useState<'CLOB' | 'Gamma' | 'Demo' | null>(null);
+  const [source, setSource] = useState<'CLOB' | 'Demo' | null>(null);
 
   useEffect(() => {
     const storedScore = parseFloat(localStorage.getItem('predictle_fp_score') || '0');
@@ -29,55 +28,71 @@ export default function PredictleFree() {
   }, []);
 
   async function fetchMarketsWithFallback() {
-  console.log("Fetching from dashboard API...");
-  try {
-    const markets = await getMarkets(100);
-    console.log("Raw markets from API:", markets);
+    console.log("Fetching from dashboard API...");
+    try {
+      const markets = await getMarkets(100);
+      console.log("Raw markets from API:", markets.length, "items");
 
-    const normalized = normalizeLiveMarkets(markets);
-    console.log("Normalized markets:", normalized);
+      const normalized = normalizeLiveMarkets(markets);
+      console.log("Valid binary markets:", normalized.length);
 
-    if (!normalized || normalized.length === 0) {
-      console.warn('No valid markets — falling back to DEMO_SET');
+      if (!normalized || normalized.length === 0) {
+        console.warn('No valid binary markets — using DEMO_SET');
+        setSource('Demo');
+        setPool(DEMO_SET);
+        setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
+      } else {
+        console.log("Using live markets! Sample:", normalized[0].question);
+        setSource('CLOB');
+        setPool(normalized);
+        setCurrent(normalized[Math.floor(Math.random() * normalized.length)]);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
       setSource('Demo');
       setPool(DEMO_SET);
       setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
-    } else {
-      console.log("Using live markets!");
-      setSource('CLOB');
-      setPool(normalized);
-      setCurrent(normalized[Math.floor(Math.random() * normalized.length)]);
     }
-  } catch (err) {
-    console.error('API fetch failed:', err);
-    setSource('Demo');
-    setPool(DEMO_SET);
-    setCurrent(DEMO_SET[Math.floor(Math.random() * DEMO_SET.length)]);
   }
-}
 
+  // FIXED: Only binary markets, correct types
   function normalizeLiveMarkets(raw: any[]): Question[] {
-    return (raw || [])
-      .map((m: any) => {
-        const q = m.question || m.title || 'Untitled market';
-        const opts =
-          (Array.isArray(m.outcomes) && m.outcomes.length === 2 && m.outcomes.map((o: any) => o.name)) ||
-          (Array.isArray(m.tokens) && m.tokens.length === 2 && m.tokens.map((t: any) => t.ticker || t.outcome)) ||
-          null;
+    const valid: Question[] = [];
 
-        if (!opts) return null;
+    for (const m of raw) {
+      const q = m.question || m.title || 'Untitled market';
 
-        const p = typeof m.yes_price === 'number' ? m.yes_price : undefined;
-        const correct = typeof p === 'number' ? (p >= 0.5 ? opts[0] : opts[1]) : opts[0];
+      // Try tokens first (Polymarket)
+      let opts: [string, string] | null = null;
+      if (Array.isArray(m.tokens) && m.tokens.length === 2) {
+        const [t1, t2] = m.tokens;
+        const o1 = t1.ticker || t1.outcome || 'Yes';
+        const o2 = t2.ticker || t2.outcome || 'No';
+        opts = [o1, o2];
+      }
+      // Fallback to outcomes (rare)
+      else if (Array.isArray(m.outcomes) && m.outcomes.length === 2) {
+        const [o1, o2] = m.outcomes;
+        opts = [o1.name || 'Yes', o2.name || 'No'];
+      }
 
-        return {
-          id: String(m.id || m.condition_id || q),
-          question: q,
-          options: opts,
-          correctAnswer: correct,
-        };
-      })
-      .filter((m): m is Question => m !== null);
+      if (!opts) {
+        console.warn(`Skipping non-binary: ${q}`);
+        continue;
+      }
+
+      const p = typeof m.yes_price === 'number' ? m.yes_price : undefined;
+      const correct = p !== undefined ? (p >= 0.5 ? opts[0] : opts[1]) : opts[0];
+
+      valid.push({
+        id: String(m.id || q),
+        question: q,
+        options: opts,
+        correctAnswer: correct,
+      });
+    }
+
+    return valid;
   }
 
   function nextQuestion() {
@@ -99,14 +114,14 @@ export default function PredictleFree() {
 
     setAnswered(true);
     setResult(correct ? 'Correct!' : `Wrong — favored: ${current.correctAnswer}`);
-    setTotalPlayed((n) => n + 1);
+    setTotalPlayed(n => n + 1);
 
     setTimeout(nextQuestion, 1300);
   }
 
   return (
     <GameContainer
-      isLiveMode={source === 'CLOB' || source === 'Gamma'}
+      isLiveMode={source === 'CLOB'}
       title="Predictle — Free Play"
     >
       <motion.div
@@ -184,7 +199,7 @@ export default function PredictleFree() {
   );
 }
 
-/** Local demo set */
+// Demo fallback
 const DEMO_SET: Question[] = [
   { id: 'demo1', question: 'Will the sun rise tomorrow?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
   { id: 'demo2', question: 'Will Bitcoin still exist in 2026?', options: ['Yes', 'No'], correctAnswer: 'Yes' },
