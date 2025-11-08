@@ -15,50 +15,70 @@ export default function PredictleGame() {
   const [won, setWon] = useState(false);
   const maxGuesses = 6;
 
-  const [market, setMarket] = useState<{ question: string; yes_price: number } | null>(null);
-const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-useEffect(() => {
-  const loadMarket = async () => {
-    try {
-      console.log('Fetching live market from dashboard...');
-      const res = await fetch('http://localhost:3000/api/markets', {
-        cache: 'no-store',
-      });
+  // Daily reset at 00:01 UTC
+  const [today, setToday] = useState<string>('');
 
-      if (!res.ok) {
-        throw new Error(`Dashboard error: ${res.status}`);
+  // Reset check every minute
+  useEffect(() => {
+    const checkReset = () => {
+      const newToday = new Date().toUTCString().slice(0, 16); // e.g., "Fri, 08 Nov 2024"
+      if (newToday !== today && today !== '') {
+        window.location.reload();
       }
+      setToday(newToday);
+    };
 
-      const data = await res.json();
-      console.log('Raw dashboard response:', data);
+    checkReset();
+    const interval = setInterval(checkReset, 60_000);
+    return () => clearInterval(interval);
+  }, [today]);
 
-      const market = Array.isArray(data) ? data[0] : data;
+  // Load market from dashboard
+  useEffect(() => {
+    const loadMarket = async () => {
+      try {
+        console.log('Fetching live market from dashboard...');
+        const res = await fetch('http://localhost:3000/api/markets', {
+          cache: 'no-store',
+        });
 
-      // STRICT VALIDATION
-      if (
-        !market ||
-        typeof market.question !== 'string' ||
-        !market.question.trim() ||
-        typeof market.yes_price !== 'number' ||
-        market.yes_price < 0 ||
-        market.yes_price > 1
-      ) {
-        throw new Error('Invalid market: missing or invalid question/price');
+        if (!res.ok) {
+          throw new Error(`Dashboard error: ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log('Raw dashboard response:', data);
+
+        const market = Array.isArray(data) ? data[0] : data;
+
+        // STRICT VALIDATION + PARSE
+        const q = market.question || market.title || market.description;
+        const pStr = market.outcomePrices || market.yes_price;
+
+        if (!q?.trim() || !pStr) {
+          throw new Error('Invalid market: missing question or price from dashboard');
+        }
+
+        // Parse price (assume "yes_price,no_price" or single yes_price)
+        const yesPrice = typeof pStr === 'string' ? parseFloat(pStr.split(',')[0]) : pStr;
+
+        if (isNaN(yesPrice) || yesPrice < 0 || yesPrice > 1) {
+          throw new Error('Invalid price: not a valid number between 0 and 1');
+        }
+
+        // ONLY SET IF 100% VALID
+        setActual(Math.round(yesPrice * 100));
+        setQuestion(q.trim());
+      } catch (err: any) {
+        console.error('MARKET REJECTED:', err.message);
+        setError(err.message);
       }
+    };
 
-      // ONLY SET IF 100% VALID
-      setActual(Math.round(market.yes_price * 100));
-      setQuestion(market.question.trim());
-      setMarket(market);
-    } catch (err: any) {
-      console.error('MARKET REJECTED:', err.message);
-      setError(err.message);
-    }
-  };
-
-  loadMarket();
-}, []);
+    loadMarket();
+  }, []);
 
   const submitGuess = () => {
     if (gameOver || actual === null) return;
@@ -94,20 +114,51 @@ useEffect(() => {
     window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
   };
 
+  // ERROR SCREEN (if dashboard fails)
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/50 rounded-3xl p-10 text-center max-w-md shadow-2xl shadow-red-600/30"
+        >
+          <h2 className="text-3xl font-black text-red-400 mb-4 text-glow">
+            NO LIVE MARKET
+          </h2>
+          <p className="text-red-300 text-sm mb-6 font-mono">
+            {error}
+          </p>
+          <p className="text-xs text-gray-400 mb-8">
+            Dashboard returned invalid data. Check console for raw response.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-8 py-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-500 transition-all shadow-lg"
+          >
+            RETRY
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // LOADING SCREEN
   if (actual === null) {
     return (
       <div className="flex items-center justify-center h-screen">
         <motion.div
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.5, repeat: Infinity }}
-          className="text-cyan-400 text-xl font-bold"
+          className="text-cyan-400 text-xl font-bold text-glow"
         >
-          LOADING MARKET...
+          FETCHING LIVE MARKET...
         </motion.div>
       </div>
     );
   }
 
+  // MAIN GAME
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0e1a] via-[#0f1a2e] to-[#0a0e1a] flex items-center justify-center p-4">
       <motion.div
