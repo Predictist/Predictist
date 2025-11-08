@@ -21,31 +21,39 @@ const [error, setError] = useState<string | null>(null);
 useEffect(() => {
   const loadMarket = async () => {
     try {
+      console.log('Fetching live market from dashboard...');
       const res = await fetch('http://localhost:3000/api/markets', {
         cache: 'no-store',
       });
 
       if (!res.ok) {
-        throw new Error(`Dashboard returned ${res.status}`);
+        throw new Error(`Dashboard error: ${res.status}`);
       }
 
       const data = await res.json();
-      const m = Array.isArray(data) ? data[0] : data;
+      console.log('Raw dashboard response:', data);
 
-      // VALIDATE: Must have question AND yes_price
-      if (!m?.question?.trim() || m.yes_price == null) {
-        throw new Error('Invalid market: missing question or price');
+      const market = Array.isArray(data) ? data[0] : data;
+
+      // STRICT VALIDATION
+      if (
+        !market ||
+        typeof market.question !== 'string' ||
+        !market.question.trim() ||
+        typeof market.yes_price !== 'number' ||
+        market.yes_price < 0 ||
+        market.yes_price > 1
+      ) {
+        throw new Error('Invalid market: missing or invalid question/price');
       }
 
-      setMarket({
-        question: m.question.trim(),
-        yes_price: m.yes_price,
-      });
-      setActual(Math.round(m.yes_price * 100));
-      setQuestion(m.question);
+      // ONLY SET IF 100% VALID
+      setActual(Math.round(market.yes_price * 100));
+      setQuestion(market.question.trim());
+      setMarket(market);
     } catch (err: any) {
-      console.error('REAL MARKET REQUIRED:', err);
-      setError(err.message || 'No valid market available');
+      console.error('MARKET REJECTED:', err.message);
+      setError(err.message);
     }
   };
 
