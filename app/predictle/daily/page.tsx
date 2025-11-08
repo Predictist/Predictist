@@ -36,7 +36,7 @@ export default function PredictleGame() {
   }, [today]);
 
   // Load market from dashboard
-  useEffect(() => {
+   useEffect(() => {
     const loadMarket = async () => {
       try {
         console.log('Fetching live market from dashboard...');
@@ -51,26 +51,25 @@ export default function PredictleGame() {
         const data = await res.json();
         console.log('Raw dashboard response:', data);
 
-        const market = Array.isArray(data) ? data[0] : data;
-
-        // STRICT VALIDATION + PARSE
-        const q = market.question || market.title || market.description;
-        const pStr = market.outcomePrices || market.yes_price;
-
-        if (!q?.trim() || !pStr) {
-          throw new Error('Invalid market: missing question or price from dashboard');
+        // DASHBOARD FORMAT: { markets: [ { title, yesPrice, ... } ] }
+        if (!data.markets || !Array.isArray(data.markets) || data.markets.length === 0) {
+          throw new Error('No markets found in dashboard response');
         }
 
-        // Parse price (assume "yes_price,no_price" or single yes_price)
-        const yesPrice = typeof pStr === 'string' ? parseFloat(pStr.split(',')[0]) : pStr;
+        const market = data.markets[0]; // Use first market
 
+        if (!market.title || market.yesPrice == null) {
+          throw new Error('First market missing title or yesPrice');
+        }
+
+        const yesPrice = parseFloat(market.yesPrice);
         if (isNaN(yesPrice) || yesPrice < 0 || yesPrice > 1) {
-          throw new Error('Invalid price: not a valid number between 0 and 1');
+          throw new Error(`Invalid yesPrice: ${market.yesPrice}`);
         }
 
-        // ONLY SET IF 100% VALID
         setActual(Math.round(yesPrice * 100));
-        setQuestion(q.trim());
+        setQuestion(market.title.trim());
+        console.log('Market loaded:', market.title, 'at', yesPrice);
       } catch (err: any) {
         console.error('MARKET REJECTED:', err.message);
         setError(err.message);
