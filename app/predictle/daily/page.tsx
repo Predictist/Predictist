@@ -16,19 +16,35 @@ export default function PredictleGame() {
   const maxGuesses = 6;
 
   useEffect(() => {
-    const loadMarket = async () => {
-      try {
-        const res = await fetch('/api/polymarket');
-        const data = await res.json();
-        setActual(Math.round(data.yes_price * 100));
-        setQuestion(data.question);
-      } catch (err) {
-        setActual(52);
-        setQuestion('Will Trump win popular vote?');
-      }
-    };
-    loadMarket();
-  }, []);
+  const loadMarket = async () => {
+    try {
+      const DASHBOARD_URL = 'http://localhost:3000/api/dashboard';
+      
+      console.log('🔗 Connecting to Dashboard →', DASHBOARD_URL);
+      
+      const res = await fetch(DASHBOARD_URL, {
+        cache: 'no-store',
+      });
+
+      if (!res.ok) throw new Error(`Dashboard returned ${res.status}`);
+
+      const data = await res.json();
+      console.log('✅ Dashboard Market:', data);
+
+      const yesPrice = data.yes_price ?? data.yesPrice ?? data.price ?? 0.5;
+      const question = data.question ?? data.marketQuestion ?? 'Unknown market';
+
+      setActual(Math.round(yesPrice * 100));
+      setQuestion(question);
+    } catch (err) {
+      console.error('❌ Dashboard offline:', err);
+      setActual(52);
+      setQuestion('Will Trump win the popular vote?');
+    }
+  };
+
+  loadMarket();
+}, []);
 
   const submitGuess = () => {
     if (gameOver || actual === null) return;
