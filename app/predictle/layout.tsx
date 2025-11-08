@@ -44,6 +44,30 @@ export default function PredictleLayout({ children }: { children: React.ReactNod
     </html>
   );
 }
-
+<style jsx global>{`
+  .slider-glow::-webkit-slider-thumb {
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    background: radial-gradient(circle at center, #06d6d6, #0891b2);
+    border-radius: 50%;
+    cursor: grab;
+    box-shadow: 0 0 20px #06d6d6, 0 0 40px #06d6d6;
+    transition: all 0.2s;
+  }
+  .slider-glow::-webkit-slider-thumb:active {
+    box-shadow: 0 0 30px #06d6d6, 0 0 60px #06d6d6;
+    transform: scale(1.1);
+  }
+  .slider-glow::-moz-range-thumb {
+    width: 32px;
+    height: 32px;
+    background: radial-gradient(circle at center, #06d6d6, #0891b2);
+    border-radius: 50%;
+    cursor: grab;
+    border: none;
+    box-shadow: 0 0 20px #06d6d6;
+  }
+`}</style>
 
 
