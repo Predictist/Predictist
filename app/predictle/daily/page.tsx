@@ -87,7 +87,7 @@ export default function PredictleGame() {
       >
         {/* HEADER */}
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-black bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-lg">
+          <h1 className="text-5xl font-black bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-glow drop-shadow-lg">
             PREDICTLE #001
           </h1>
           <p className="text-cyan-300 text-sm mt-2 font-medium tracking-wider">6 GUESSES • 1 CENT • PURE SKILL</p>
@@ -113,7 +113,7 @@ export default function PredictleGame() {
                   onChange={(e) => setGuess(parseInt(e.target.value))}
                   className="w-full h-3 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-full appearance-none cursor-grab slider-glow"
                   style={{
-                    background: `linear-gradient(to right, #0891b2 ${guess}%, #1e293b ${guess}%)`,
+                    background: `linear-gradient(to right, #0891b2 0%, #0891b2 ${guess}%, #1e293b ${guess}%, #1e293b 100%)`,
                   }}
                 />
                 <div className="flex justify-between mt-2 text-xs text-cyan-400 font-mono">
