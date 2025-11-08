@@ -18,26 +18,31 @@ export default function PredictleGame() {
   useEffect(() => {
   const loadMarket = async () => {
     try {
-      const DASHBOARD_URL = 'http://localhost:3000/api/dashboard';
+      const DASHBOARD_API = 'http://localhost:3000/api/markets';
       
-      console.log('🔗 Connecting to Dashboard →', DASHBOARD_URL);
+      console.log('Fetching market from:', DASHBOARD_API);
       
-      const res = await fetch(DASHBOARD_URL, {
+      const res = await fetch(DASHBOARD_API, {
         cache: 'no-store',
       });
 
-      if (!res.ok) throw new Error(`Dashboard returned ${res.status}`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
 
       const data = await res.json();
-      console.log('✅ Dashboard Market:', data);
+      console.log('Market loaded:', data);
 
-      const yesPrice = data.yes_price ?? data.yesPrice ?? data.price ?? 0.5;
-      const question = data.question ?? data.marketQuestion ?? 'Unknown market';
+      // Handle array or object
+      const market = Array.isArray(data) ? data[0] : data;
+      const yesPrice = market.yes_price ?? market.yesPrice ?? market.price ?? 0.5;
+      const question = market.question ?? market.title ?? 'Unknown market';
 
       setActual(Math.round(yesPrice * 100));
       setQuestion(question);
     } catch (err) {
-      console.error('❌ Dashboard offline:', err);
+      console.error('Markets API failed:', err);
       setActual(52);
       setQuestion('Will Trump win the popular vote?');
     }
