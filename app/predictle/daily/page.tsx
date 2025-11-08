@@ -15,36 +15,37 @@ export default function PredictleGame() {
   const [won, setWon] = useState(false);
   const maxGuesses = 6;
 
-  useEffect(() => {
+  const [market, setMarket] = useState<{ question: string; yes_price: number } | null>(null);
+const [error, setError] = useState<string | null>(null);
+
+useEffect(() => {
   const loadMarket = async () => {
     try {
-      const DASHBOARD_API = 'http://localhost:3000/api/markets';
-      
-      console.log('Fetching market from:', DASHBOARD_API);
-      
-      const res = await fetch(DASHBOARD_API, {
+      const res = await fetch('http://localhost:3000/api/markets', {
         cache: 'no-store',
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}: ${text}`);
+        throw new Error(`Dashboard returned ${res.status}`);
       }
 
       const data = await res.json();
-      console.log('Market loaded:', data);
+      const m = Array.isArray(data) ? data[0] : data;
 
-      // Handle array or object
-      const market = Array.isArray(data) ? data[0] : data;
-      const yesPrice = market.yes_price ?? market.yesPrice ?? market.price ?? 0.5;
-      const question = market.question ?? market.title ?? 'Unknown market';
+      // VALIDATE: Must have question AND yes_price
+      if (!m?.question?.trim() || m.yes_price == null) {
+        throw new Error('Invalid market: missing question or price');
+      }
 
-      setActual(Math.round(yesPrice * 100));
-      setQuestion(question);
-    } catch (err) {
-      console.error('Markets API failed:', err);
-      setActual(52);
-      setQuestion('Will Trump win the popular vote?');
+      setMarket({
+        question: m.question.trim(),
+        yes_price: m.yes_price,
+      });
+      setActual(Math.round(m.yes_price * 100));
+      setQuestion(m.question);
+    } catch (err: any) {
+      console.error('REAL MARKET REQUIRED:', err);
+      setError(err.message || 'No valid market available');
     }
   };
 
