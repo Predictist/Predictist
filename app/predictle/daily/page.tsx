@@ -13,30 +13,30 @@ export default function PredictleGame() {
   const [grid, setGrid] = useState('');
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
+  const [marketId, setMarketId] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const maxGuesses = 6;
 
-  const [error, setError] = useState<string | null>(null);
-
-  // Daily reset at 00:01 UTC
-  const [today, setToday] = useState<string>('');
-
-  // Reset check every minute
-  useEffect(() => {
-    const checkReset = () => {
-      const newToday = new Date().toUTCString().slice(0, 16); // e.g., "Fri, 08 Nov 2024"
-      if (newToday !== today && today !== '') {
-        window.location.reload();
-      }
-      setToday(newToday);
+  // COUNTDOWN TO 00:00 UTC
+  const startCountdown = () => {
+    const update = () => {
+      const now = new Date();
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+      const diff = tomorrow.getTime() - now.getTime();
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setCountdown(`${hours}h ${minutes}m ${seconds}s`);
     };
-
-    checkReset();
-    const interval = setInterval(checkReset, 60_000);
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [today]);
+  };
 
-  // Load market from dashboard
-   useEffect(() => {
+  // LOAD GLOBAL DAILY MARKET
+  useEffect(() => {
     const loadMarket = async () => {
       try {
         console.log('Fetching live market from dashboard...');
@@ -56,10 +56,18 @@ export default function PredictleGame() {
           throw new Error('No markets found in dashboard response');
         }
 
-        const market = data.markets[0]; // Use first market
+        const lastUpdated = new Date(data.lastUpdated);
+        const todayUTC = lastUpdated.toISOString().split('T')[0];
+
+        const todayMarkets = data.markets.filter((m: any) => {
+          const close = new Date(m.closeTime);
+          return close.toISOString().split('T')[0] === todayUTC;
+        });
+
+        const market = todayMarkets[0] || data.markets[0]; // First matching or fallback to first
 
         if (!market.title || market.yesPrice == null) {
-          throw new Error('First market missing title or yesPrice');
+          throw new Error('Market missing title or yesPrice');
         }
 
         const yesPrice = parseFloat(market.yesPrice);
@@ -69,6 +77,7 @@ export default function PredictleGame() {
 
         setActual(Math.round(yesPrice * 100));
         setQuestion(market.title.trim());
+        setMarketId(market.id);
         console.log('Market loaded:', market.title, 'at', yesPrice);
       } catch (err: any) {
         console.error('MARKET REJECTED:', err.message);
@@ -78,6 +87,20 @@ export default function PredictleGame() {
 
     loadMarket();
   }, []);
+
+  // CHECK IF PLAYED TODAY
+  useEffect(() => {
+    if (!marketId) return;
+    const played = localStorage.getItem('predictle_played');
+    const playedDate = localStorage.getItem('predictle_date');
+    const playedMarket = localStorage.getItem('predictle_market');
+    const today = new Date().toISOString().split('T')[0];
+
+    if (played && playedDate === today && playedMarket === marketId) {
+      setHasPlayed(true);
+      startCountdown();
+    }
+  }, [marketId]);
 
   const submitGuess = () => {
     if (gameOver || actual === null) return;
@@ -104,6 +127,14 @@ export default function PredictleGame() {
     } else {
       setGrid('⬜'.repeat(6));
     }
+
+    // LOCK FOR TODAY
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem('predictle_played', 'true');
+    localStorage.setItem('predictle_date', today);
+    localStorage.setItem('predictle_market', marketId || '');
+    setHasPlayed(true);
+    startCountdown();
   };
 
   const shareToX = () => {
@@ -142,6 +173,32 @@ export default function PredictleGame() {
     );
   }
 
+  // LOCKED SCREEN WITH COUNTDOWN
+  if (hasPlayed) {
+    return (
+      <div className="flex items-center justify-center h-screen p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-br from-gray-900/80 to-black/80 backdrop-blur-xl rounded-3xl p-10 text-center max-w-md border border-cyan-500/30 shadow-2xl shadow-cyan-500/20"
+        >
+          <h2 className="text-3xl font-black text-cyan-400 mb-4 text-glow">
+            GAME LOCKED 😎
+          </h2>
+          <p className="text-gray-300 mb-6">
+            You conquered today's Predictle!
+          </p>
+          <div className="text-4xl font-mono text-cyan-400 mb-6">
+            {countdown}
+          </div>
+          <p className="text-sm text-gray-400">
+            New market unlocks at 00:00 UTC
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   // LOADING SCREEN
   if (actual === null) {
     return (
@@ -175,7 +232,7 @@ export default function PredictleGame() {
 
         {/* CARD */}
         <div className="relative bg-gradient-to-br from-[#0f1a2e]/80 to-[#0a0e1a]/80 backdrop-blur-xl rounded-3xl p-8 border border-cyan-500/30 shadow-2xl shadow-cyan-500/20">
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 blur-xl -z-10"></div>
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-cyan-400/10 to-blue-500/10 blur-xl -z-10"></div>
 
           {/* QUESTION */}
           <p className="text-gray-300 text-center text-sm mb-8 leading-relaxed">“{question}”</p>
